@@ -220,6 +220,11 @@ Ergonomi yardımcıları:
 
 ---
 
+## Üçüncü Taraf Lisansları
+Bu projede kullanılan bağımlılıkların lisansları için: [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md)
+
+---
+
 ## Lisans
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](./LICENSE)
 
