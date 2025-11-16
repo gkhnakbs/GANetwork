@@ -221,5 +221,6 @@ Ergonomi yardımcıları:
 ---
 
 ## Lisans
-Bu proje için lisans dosyasını ekleyin veya burada belirtin (örn. MIT).
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](./LICENSE)
 
+Bu proje MIT lisansı ile lisanslanmıştır. Ayrıntılar için [LICENSE](./LICENSE) dosyasına bakınız.
