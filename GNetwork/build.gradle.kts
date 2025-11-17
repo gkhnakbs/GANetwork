@@ -8,7 +8,7 @@ plugins {
 }
 
 group = "com.gkhnakbs"
-version = "1.1.0"
+version = "1.0.0"
 
 base {
     archivesName.set("gnetwork")
