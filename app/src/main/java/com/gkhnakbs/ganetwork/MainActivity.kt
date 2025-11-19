@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularWavyProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Text
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -17,17 +19,18 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
-import com.gkhnakbs.gnetwork.extensions.httpClient
-import com.gkhnakbs.gnetwork.response.onSuccess
+import androidx.compose.ui.unit.dp
 import com.gkhnakbs.ganetwork.responseWeather.CurrentUnits
 import com.gkhnakbs.ganetwork.responseWeather.WeatherResponse
 import com.gkhnakbs.ganetwork.ui.theme.GANetwork3Theme
 import com.gkhnakbs.gnetwork.extensions.get
-import kotlinx.coroutines.launch
+import com.gkhnakbs.gnetwork.extensions.httpClient
 import com.gkhnakbs.gnetwork.interceptor.LoggingInterceptor
-import com.gkhnakbs.gnetwork.interceptor.AuthInterceptor
+import com.gkhnakbs.gnetwork.response.onSuccess
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
+    @OptIn(ExperimentalMaterial3ExpressiveApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -53,6 +56,7 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             val text = remember { mutableStateOf("GNetwork Test") }
+            val isLoading = remember { mutableStateOf(false) }
             val scope = rememberCoroutineScope()
             GANetwork3Theme {
                 Column(
@@ -67,9 +71,16 @@ class MainActivity : ComponentActivity() {
                         textAlign = TextAlign.Center
                     )
 
+                    if(isLoading.value){
+                        CircularWavyProgressIndicator(
+                            waveSpeed = 5.dp
+                        )
+                    }
+
                     Button(
                         onClick = {
                             scope.launch {
+                                isLoading.value = true
                                 val test = client.get<WeatherResponse<CurrentUnits>>("v1/forecast") {
                                     queryParam("latitude", "38.643976")
                                     queryParam("longitude", "34.734958")
@@ -78,6 +89,7 @@ class MainActivity : ComponentActivity() {
                                 }
 
                                 test.onSuccess {
+                                    isLoading.value = false
                                     text.value = "${it.current?.temperature_2m} ${it.current_units?.temperature_2m}"
                                 }
                             }
