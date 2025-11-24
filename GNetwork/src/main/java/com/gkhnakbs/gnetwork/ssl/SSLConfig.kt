@@ -25,19 +25,28 @@ data class SSLConfig(
         /**
          * Tüm sertifikaları kabul eden güvensiz yapılandırma
          * ⚠️ SADECE DEBUG/TEST için kullanın!
+         * ⚠️ PRODUCTION'DA ASLA KULLANMAYIN!
+         *
+         * Bu metod sertifika doğrulamasını devre dışı bırakır ve
+         * man-in-the-middle (MITM) saldırılarına karşı savunmasız hale getirir.
          */
+        @Suppress("CustomX509TrustManager")
         fun unsafeAllowAll(): SSLConfig {
-            val trustAllCerts = arrayOf<TrustManager>(object : X509TrustManager {
+            val trustAllCerts = arrayOf<TrustManager>(
                 @Suppress("TrustAllX509TrustManager")
-                override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String) {
-                }
+                object : X509TrustManager {
+                    @Suppress("TrustAllX509TrustManager")
+                    override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String) {
+                        // ⚠️ Sertifika doğrulaması yapılmıyor - SADECE DEBUG!
+                    }
 
-                @Suppress("TrustAllX509TrustManager")
-                override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String) {
-                }
+                    @Suppress("TrustAllX509TrustManager")
+                    override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String) {
+                        // ⚠️ Sertifika doğrulaması yapılmıyor - SADECE DEBUG!
+                    }
 
-                override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf()
-            })
+                    override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf()
+                })
 
             val sslContext = SSLContext.getInstance("TLS").apply {
                 init(null, trustAllCerts, java.security.SecureRandom())
