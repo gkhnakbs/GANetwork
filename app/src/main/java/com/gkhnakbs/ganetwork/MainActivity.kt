@@ -55,7 +55,7 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
-            val text = remember { mutableStateOf("GNetwork Test") }
+            val response = remember { mutableStateOf<WeatherResponse<CurrentUnits>?>(null) }
             val isLoading = remember { mutableStateOf(false) }
             val scope = rememberCoroutineScope()
             GANetwork3Theme {
@@ -67,11 +67,15 @@ class MainActivity : ComponentActivity() {
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
-                        text = text.value ,
+                        text = "LatLng -> ${response.value?.latitude.toString()} - ${response.value?.longitude.toString()}",
+                        textAlign = TextAlign.Center
+                    )
+                    Text(
+                        text = "Current Temperature -> " + response.value?.current?.temperature_2m.toString(),
                         textAlign = TextAlign.Center
                     )
 
-                    if(isLoading.value){
+                    if (isLoading.value) {
                         CircularWavyProgressIndicator(
                             waveSpeed = 5.dp
                         )
@@ -81,17 +85,18 @@ class MainActivity : ComponentActivity() {
                         onClick = {
                             scope.launch {
                                 isLoading.value = true
-                                val test = client.get<WeatherResponse<CurrentUnits>>("v1/forecast") {
-                                    queryParam("latitude", "38.643976")
-                                    queryParam("longitude", "34.734958")
-                                    queryParam("hourly", "temperature_2m")
-                                    queryParam("current", "temperature_2m,relative_humidity_2m")
-                                }
+                                val test =
+                                    client.get<WeatherResponse<CurrentUnits>>("v1/forecast") {
+                                        queryParam("latitude", "38.643976")
+                                        queryParam("longitude", "34.734958")
+                                        queryParam("hourly", "temperature_2m")
+                                        queryParam("current", "temperature_2m,relative_humidity_2m")
+                                    }
 
 
                                 test.onSuccess {
                                     isLoading.value = false
-                                    text.value = "${it.current?.temperature_2m} ${it.current_units?.temperature_2m}"
+                                    response.value = it
                                 }
                             }
                         }
