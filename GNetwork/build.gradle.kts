@@ -8,7 +8,7 @@ plugins {
 }
 
 group = "com.gkhnakbs"
-version = "1.0.0"
+version = "1.0.1"
 
 base {
     archivesName.set("gnetwork")
@@ -29,6 +29,8 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.kotlinx.coroutines.core)
 }
+
+
 
 publishing {
     publications {
