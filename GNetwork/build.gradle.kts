@@ -4,6 +4,7 @@ plugins {
     alias(libs.plugins.java.library)
     alias(libs.plugins.jetbrains.kotlin.jvm)
     alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.maven.publish)
 }
 
 group = "com.gkhnakbs"
@@ -27,4 +28,18 @@ kotlin {
 dependencies {
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.kotlinx.coroutines.core)
+}
+
+publishing {
+    publications {
+        create<MavenPublication>("maven") {
+            from(components["java"])
+
+            artifactId = "gnetwork"
+
+            // İstersen groupId ve version'u da buraya sabitleyebilirsin
+            groupId = "com.gkhnakbs"
+            version = "1.0.0"
+        }
+    }
 }

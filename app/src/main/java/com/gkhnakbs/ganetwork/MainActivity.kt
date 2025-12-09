@@ -88,6 +88,7 @@ class MainActivity : ComponentActivity() {
                                     queryParam("current", "temperature_2m,relative_humidity_2m")
                                 }
 
+
                                 test.onSuccess {
                                     isLoading.value = false
                                     text.value = "${it.current?.temperature_2m} ${it.current_units?.temperature_2m}"

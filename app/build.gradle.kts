@@ -63,5 +63,5 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 
-    implementation(project(":GNetwork"))
+    implementation("com.gkhnakbs:gnetwork:1.0.0")
 }

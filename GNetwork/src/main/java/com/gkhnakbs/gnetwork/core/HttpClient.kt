@@ -32,6 +32,7 @@ class HttpClient(
     val defaultHeaders: Map<String, String> = emptyMap(),
     val baseUrl: String = "",
     val json: Json = Json {
+        prettyPrint = true
         ignoreUnknownKeys = true
         isLenient = true
         encodeDefaults = true
