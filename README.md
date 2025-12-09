@@ -6,7 +6,6 @@ Modern Kotlin/Android için basit, esnek ve genişletilebilir bir network kütü
 - Interceptor zinciri: Logging, Auth ve kolay genişletilebilir mimari
 - SSL/TLS: Özel TrustManager, HostnameVerifier ve Certificate Pinning
 - GZip ve charset desteği; doğru gövde okuma
-- Query parametrelerinin güvenli encode edilmesi (virgüller korunur)
 - Net sonuç modeli: `HttpResponse.Success/Failure/Error`
 
 ---
