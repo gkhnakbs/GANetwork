@@ -7,9 +7,6 @@ plugins {
     alias(libs.plugins.maven.publish)
 }
 
-group = "com.gkhnakbs"
-version = "1.0.1"
-
 base {
     archivesName.set("gnetwork")
 }
@@ -39,7 +36,6 @@ publishing {
 
             artifactId = "gnetwork"
 
-            // İstersen groupId ve version'u da buraya sabitleyebilirsin
             groupId = "com.gkhnakbs"
             version = "1.0.0"
         }
