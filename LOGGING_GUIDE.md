@@ -339,6 +339,3 @@ Yeni logging format:
 5. Her log satırı düzenli girintili
 6. Request ve Response net ayrılmış
 7. Timing bilgisi daha görünür
-
-🎉 **Artık loglar çok daha güzel görünüyor!**
-
