@@ -222,9 +222,7 @@ fun `should fail with wrong pin`() = runTest {
 
 ---
 
-**Hazırladı:** GitHub Copilot  
+**Hazırladı:** Gökhan Akbaş 
 **Tarih:** 16 Kasım 2025  
-**Versiyon:** GNetwork v1.0 + SSL/TLS  
-
-🎉 **SSL/TLS desteği başarıyla tamamlandı!**
+**Versiyon:** GNetwork v1.0 + SSL/TLS 
 
