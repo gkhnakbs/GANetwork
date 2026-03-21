@@ -201,6 +201,7 @@ Ergonomi yardımcıları:
 ---
 
 ## Yol Haritası
+- TokenAuthenticator(Authenticator interface and override authenticate)
 - RetryInterceptor (exponential backoff, idempotent metodlar)
 - CacheInterceptor (ETag, Cache-Control, disk/memory)
 - Multipart/Form-Data (dosya upload)
