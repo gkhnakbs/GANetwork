@@ -11,5 +11,7 @@ enum class ContentType(val value: String) {
     /** URL-encoded form data (`application/x-www-form-urlencoded`). */
     FORM_URL_ENCODED("application/x-www-form-urlencoded"),
     /** Plain text (`text/plain`). */
-    TEXT_PLAIN("text/plain")
+    TEXT_PLAIN("text/plain"),
+    /** Multipart form data for file uploads (`multipart/form-data`). */
+    MULTIPART_FORM_DATA("multipart/form-data")
 }

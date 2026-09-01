@@ -209,7 +209,7 @@ class HttpClient(
             doInput = true
             useCaches = false
             instanceFollowRedirects = true
-            doOutput = request.body != null && request.method.allowsBody
+            doOutput = (request.body != null || request.rawBody != null) && request.method.allowsBody
         }
 
         // Önce custom header'ları uygula, sonra eksikleri tamamla
@@ -255,21 +255,19 @@ class HttpClient(
      */
     @PublishedApi
     internal fun writeRequestBody(connection: HttpURLConnection, request: HttpRequest) {
-        val body = request.body ?: return
         if (!request.method.allowsBody) return
-        val bytes = body.toByteArray(Charsets.UTF_8)
+        val bytes = request.rawBody ?: request.body?.toByteArray(Charsets.UTF_8) ?: return
         connection.doOutput = true
         val existingCT = connection.getRequestProperty("Content-Type")
         val desiredCT = request.contentType?.value ?: existingCT ?: "application/json"
-        val finalCT = if (!desiredCT.contains(
-                "charset",
-                ignoreCase = true
-            )
-        ) "$desiredCT; charset=UTF-8" else desiredCT
-        if (existingCT == null || existingCT != finalCT) connection.setRequestProperty(
-            "Content-Type",
-            finalCT
-        )
+        val finalCT = if (!desiredCT.contains("charset", ignoreCase = true) && !desiredCT.startsWith("multipart/", ignoreCase = true)) {
+            "$desiredCT; charset=UTF-8"
+        } else {
+            desiredCT
+        }
+        if (existingCT == null || existingCT != finalCT) {
+            connection.setRequestProperty("Content-Type", finalCT)
+        }
         connection.setFixedLengthStreamingMode(bytes.size)
         connection.outputStream.buffered().use { it.write(bytes); it.flush() }
     }

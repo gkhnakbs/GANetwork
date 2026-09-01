@@ -18,6 +18,7 @@ class HttpRequestBuilder {
     private val headers = mutableMapOf<String, String>()
     private val queryParams = mutableMapOf<String, String>()
     private var body: String? = null
+    private var rawBody: ByteArray? = null
     private var contentType: ContentType? = null
     private var retryConfig: RetryConfig? = null
     private var cachePolicy: CachePolicy = CachePolicy.DEFAULT
@@ -71,6 +72,7 @@ class HttpRequestBuilder {
      */
     fun jsonBody(json: String) {
         body = json
+        rawBody = null
         contentType = ContentType.JSON
         header("Content-Type", ContentType.JSON.value)
     }
@@ -81,6 +83,7 @@ class HttpRequestBuilder {
     fun jsonBody(block: JsonBodyBuilder.() -> Unit) {
         val builder = JsonBodyBuilder().apply(block)
         body = builder.build()
+        rawBody = null
         contentType = ContentType.JSON
         header("Content-Type", ContentType.JSON.value)
     }
@@ -93,6 +96,7 @@ class HttpRequestBuilder {
             "${URLEncoder.encode(key, "UTF-8")}=${URLEncoder.encode(value, "UTF-8")}"
         }
         body = formData
+        rawBody = null
         contentType = ContentType.FORM_URL_ENCODED
         header("Content-Type", ContentType.FORM_URL_ENCODED.value)
     }
@@ -103,6 +107,7 @@ class HttpRequestBuilder {
     fun formBody(block: FormBodyBuilder.() -> Unit) {
         val builder = FormBodyBuilder().apply(block)
         body = builder.build()
+        rawBody = null
         contentType = ContentType.FORM_URL_ENCODED
         header("Content-Type", ContentType.FORM_URL_ENCODED.value)
     }
@@ -112,8 +117,38 @@ class HttpRequestBuilder {
      */
     fun textBody(text: String) {
         body = text
+        rawBody = null
         contentType = ContentType.TEXT_PLAIN
         header("Content-Type", ContentType.TEXT_PLAIN.value)
+    }
+
+    /**
+     * Configures a multipart/form-data request body for uploading files, byte arrays, and form fields.
+     *
+     * Automatically serializes parts into an RFC-compliant binary payload and sets the
+     * Content-Type header with the corresponding boundary.
+     *
+     * @param block DSL builder for adding fields, files, or byte arrays.
+     */
+    fun multipartBody(block: MultipartBodyBuilder.() -> Unit) {
+        val builder = MultipartBodyBuilder().apply(block)
+        val bytes = builder.build()
+        this.rawBody = bytes
+        this.body = null
+        this.contentType = ContentType.MULTIPART_FORM_DATA
+        header("Content-Type", "multipart/form-data; boundary=${builder.boundary}")
+    }
+
+    /**
+     * Sets a raw binary byte array as the request body.
+     *
+     * @param bytes The raw byte array.
+     * @param contentType The MIME content type (defaults to application/octet-stream).
+     */
+    fun binaryBody(bytes: ByteArray, contentType: String = "application/octet-stream") {
+        this.rawBody = bytes
+        this.body = null
+        header("Content-Type", contentType)
     }
 
     /**
@@ -189,6 +224,7 @@ class HttpRequestBuilder {
             method = method,
             headers = headers.toMap(),
             body = body,
+            rawBody = rawBody,
             contentType = contentType,
             retryConfig = retryConfig,
             cachePolicy = cachePolicy,

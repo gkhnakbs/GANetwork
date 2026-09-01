@@ -230,6 +230,27 @@ client.get<WeatherResponse>("weather") {
 }
 ```
 
+### Multipart / Form-Data (Dosya ve Görsel Yükleme)
+Dosya (`java.io.File`), görsel bayt dizileri (`ByteArray`) ve metin form alanlarını tek bir istekte sunucuya yükleme desteği sunar. Dosya uzantısına göre MIME tipleri otomatik tespit edilir (istenirse elle de belirtilebilir).
+
+```kotlin
+val pdfFile = File(context.cacheDir, "ogrenci_belgesi.pdf")
+
+val response = client.post<UploadResponse>("api/v1/student/upload") {
+    multipartBody {
+        // 1. Metin Form Alanları:
+        part("studentId", "2024105012")
+        part("documentType", "STUDENT_CERTIFICATE")
+
+        // 2. Dosya (MIME tipi .pdf uzantısından 'application/pdf' olarak otomatik algılanır):
+        part("documentFile", pdfFile)
+
+        // 3. Doğrudan ByteArray (ör. kameradan alınan JPEG görseli):
+        // part(name = "avatar", filename = "selfie.jpg", bytes = imageBytes)
+    }
+}
+```
+
 ---
 
 ## SSL/TLS Yapılandırması
@@ -279,8 +300,8 @@ Ergonomi yardımcıları:
 - [x] TokenAuthenticator (Authenticator arayüzü, BearerTokenAuthenticator ve 401 Mutex retry)
 - [x] RetryInterceptor (Exponential backoff, jitter, client ve istek bazlı özelleştirilebilir retry)
 - [x] CacheInterceptor (ETag, Cache-Control, In-Memory LRU Cache, 304 Not Modified, CachePolicy)
-- [ ] Multipart/Form-Data (dosya upload)
-- Progress takibi (upload/download)
+- [x] Multipart/Form-Data (Dosya, görsel, binary ve form alanları yükleme desteği)
+- [ ] Progress takibi (upload/download)
 - TimeoutInterceptor (call-level timeout)
 - Metrics/AnalyticsInterceptor
 - Redirect yönetimi (307/308 method/body preservation)
