@@ -7,14 +7,19 @@ import java.util.Base64
 import javax.net.ssl.SSLPeerUnverifiedException
 
 /**
- * Sertifika pinning - belirli sertifikaları veya public key'leri zorunlu kılar
+ * Enforces certificate pinning against known SHA-256 public key hashes to prevent MITM attacks.
+ *
+ * @property pins Map of hostnames to expected [Pin] public key fingerprints.
  */
 class CertificatePinner private constructor(
     private val pins: Map<String, List<Pin>>,
 ) {
     /**
-     * Verilen hostname için sertifika zincirini doğrular
-     * @throws SSLPeerUnverifiedException pin match bulunamazsa
+     * Verifies that at least one certificate in [certificates] matches the configured pin for [hostname].
+     *
+     * @param hostname Target server host.
+     * @param certificates Peer certificate chain presented during the TLS handshake.
+     * @throws SSLPeerUnverifiedException If no certificate matches any pinned public key hash.
      */
     fun check(hostname: String, certificates: List<Certificate>) {
         val cleanHostname = hostname.lowercase().trim()
@@ -57,6 +62,12 @@ class CertificatePinner private constructor(
         return Base64.getEncoder().encodeToString(this)
     }
 
+    /**
+     * Represents a single public key cryptographic pin.
+     *
+     * @property hashAlgorithm Algorithm used for the pin (typically "sha256").
+     * @property hash Byte array of the digest.
+     */
     data class Pin(val hashAlgorithm: String, val hash: ByteArray) {
         override fun toString(): String = "$hashAlgorithm/${hash.toBase64()}"
 
@@ -79,12 +90,15 @@ class CertificatePinner private constructor(
         }
     }
 
+    /**
+     * Builder for constructing [CertificatePinner] instances.
+     */
     class Builder {
         private val pins = mutableMapOf<String, MutableList<Pin>>()
 
         /**
-         * SHA-256 hash ile pin ekle
-         * Format: "sha256/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+         * Adds one or more SHA-256 pins for the specified [hostname].
+         * Format: `"sha256/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="`
          */
         fun add(hostname: String, vararg pinHashes: String) = apply {
             val cleanHostname = hostname.lowercase().trim()
@@ -114,12 +128,18 @@ class CertificatePinner private constructor(
             return Pin(algorithm, hash)
         }
 
+        /**
+         * Builds the configured [CertificatePinner].
+         */
         fun build(): CertificatePinner {
             return CertificatePinner(pins.toMap())
         }
     }
 
     companion object {
+        /**
+         * Creates a new [Builder].
+         */
         fun builder(): Builder = Builder()
     }
 }

@@ -1,51 +1,127 @@
 package com.gkhnakbs.gnetwork.core
 
+import com.gkhnakbs.gnetwork.auth.Authenticator
+import com.gkhnakbs.gnetwork.auth.BearerTokenAuthenticator
+import com.gkhnakbs.gnetwork.retry.RetryConfig
+import com.gkhnakbs.gnetwork.retry.RetryConfigBuilder
+import com.gkhnakbs.gnetwork.retry.RetryInterceptor
 import com.gkhnakbs.gnetwork.ssl.SSLConfig
 import com.gkhnakbs.gnetwork.ssl.SSLConfigBuilder
 
 /**
+ * Builder class for constructing and configuring [HttpClient] instances.
+ *
  * Created by Gökhan Akbaş on 12/11/2025.
  */
-
 class HttpClientBuilder {
     private val defaultHeaders = mutableMapOf<String, String>()
     private val interceptors = mutableListOf<com.gkhnakbs.gnetwork.interceptor.Interceptor>()
     var baseUrl: String = ""
     private var sslConfig: SSLConfig = SSLConfig.default()
+    private var authenticator: Authenticator = Authenticator.NONE
+    private var retryConfig: RetryConfig? = null
 
+    /**
+     * Configures default HTTP headers applied to all outgoing requests.
+     */
     fun headers(block: MutableMap<String, String>.() -> Unit) {
         defaultHeaders.apply(block)
     }
 
+    /**
+     * Appends an [interceptor] to the execution pipeline.
+     */
     fun addInterceptor(interceptor: com.gkhnakbs.gnetwork.interceptor.Interceptor) = apply {
         interceptors += interceptor
     }
 
+    /**
+     * Configures the list of interceptors via a builder block.
+     */
     fun interceptors(block: MutableList<com.gkhnakbs.gnetwork.interceptor.Interceptor>.() -> Unit) =
         apply {
             interceptors.apply(block)
         }
 
     /**
-     * SSL/TLS yapılandırması ekle
+     * Sets a custom [Authenticator] for handling 401 Unauthorized responses.
+     */
+    fun authenticator(authenticator: Authenticator) = apply {
+        this.authenticator = authenticator
+    }
+
+    /**
+     * Configures a Mutex-protected [BearerTokenAuthenticator].
+     *
+     * @param headerName Name of the auth header (defaults to "Authorization").
+     * @param tokenPrefix Token scheme prefix (defaults to "Bearer ").
+     * @param currentToken Optional supplier for the current cached token to avoid duplicate refresh calls.
+     * @param onRefreshToken Suspend callback to fetch a new token given the expired token.
+     */
+    fun tokenAuthenticator(
+        headerName: String = "Authorization",
+        tokenPrefix: String = "Bearer ",
+        currentToken: (suspend () -> String?)? = null,
+        onRefreshToken: suspend (expiredToken: String?) -> String?,
+    ) = apply {
+        this.authenticator = BearerTokenAuthenticator(
+            headerName = headerName,
+            tokenPrefix = tokenPrefix,
+            currentToken = currentToken,
+            onRefreshToken = onRefreshToken
+        )
+    }
+
+    /**
+     * Convenience overload configuring a token authenticator with just an [onRefreshToken] block.
+     */
+    fun tokenAuthenticator(
+        onRefreshToken: suspend (expiredToken: String?) -> String?,
+    ) = tokenAuthenticator(currentToken = null, onRefreshToken = onRefreshToken)
+
+    /**
+     * Sets the default [RetryConfig] applied to requests that do not specify their own retry policy.
+     */
+    fun retryConfig(config: RetryConfig) = apply {
+        this.retryConfig = config
+    }
+
+    /**
+     * Configures the default [RetryConfig] using a DSL builder block.
+     */
+    fun retryConfig(block: RetryConfigBuilder.() -> Unit) = apply {
+        this.retryConfig = RetryConfigBuilder().apply(block).build()
+    }
+
+    /**
+     * Sets the [SSLConfig] for HTTPS connections.
      */
     fun sslConfig(config: SSLConfig) = apply {
         this.sslConfig = config
     }
 
     /**
-     * SSL/TLS yapılandırması builder ile ekle
+     * Configures [SSLConfig] using a DSL builder block.
      */
     fun sslConfig(block: SSLConfigBuilder.() -> Unit) = apply {
         this.sslConfig = SSLConfigBuilder().apply(block).build()
     }
 
+    /**
+     * Builds and returns the configured [HttpClient].
+     */
     fun build(): HttpClient {
+        val allInterceptors = mutableListOf<com.gkhnakbs.gnetwork.interceptor.Interceptor>()
+        // RetryInterceptor sits at the head of the pipeline to re-execute subsequent interceptors upon retry
+        allInterceptors.add(RetryInterceptor(defaultConfig = retryConfig))
+        allInterceptors.addAll(interceptors)
+
         return HttpClient(
             defaultHeaders = defaultHeaders.toMap(),
             baseUrl = baseUrl,
-            interceptors = interceptors.toList(),
-            sslConfig = sslConfig
+            interceptors = allInterceptors,
+            sslConfig = sslConfig,
+            authenticator = authenticator,
         )
     }
 }

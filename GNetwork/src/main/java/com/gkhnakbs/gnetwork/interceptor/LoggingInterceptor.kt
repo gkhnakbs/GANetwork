@@ -5,7 +5,13 @@ import kotlinx.coroutines.withContext
 import java.nio.charset.Charset
 
 /**
- * Profesyonel, okunabilir logging interceptor
+ * Interceptor that logs outgoing requests and incoming responses with customizable detail levels.
+ *
+ * Supports formatted JSON output, HTTP headers, request/response body, and latency measurements.
+ *
+ * @property logger Output function consuming log messages (defaults to `println`).
+ * @property level Granularity of logging ([Level.NONE], [Level.BASIC], [Level.HEADERS], [Level.BODY]).
+ * @property charset Character encoding used to decode response bodies (defaults to UTF-8).
  */
 class LoggingInterceptor(
     private val logger: (String) -> Unit = { println(it) },
@@ -13,7 +19,19 @@ class LoggingInterceptor(
     private val charset: Charset = Charsets.UTF_8,
 ) : Interceptor {
 
-    enum class Level { NONE, BASIC, BODY , HEADERS}
+    /**
+     * Controls the detail level of network logs.
+     */
+    enum class Level {
+        /** No logging. */
+        NONE,
+        /** Logs request method, URL, response status code, and latency. */
+        BASIC,
+        /** Logs basic details plus request and response headers. */
+        HEADERS,
+        /** Logs basic details, headers, and formatted request/response bodies. */
+        BODY
+    }
 
     override suspend fun intercept(chain: Interceptor.Chain): RawResponse {
         if (level == Level.NONE) return chain.proceed(chain.request)

@@ -9,12 +9,12 @@ import javax.net.ssl.TrustManagerFactory
 import javax.net.ssl.X509TrustManager
 
 /**
- * SSL/TLS yardımcı fonksiyonlar
+ * Utility functions for loading X.509 certificates and configuring custom SSL/TLS trust managers.
  */
 object SSLHelper {
 
     /**
-     * PEM formatındaki sertifikadan X509Certificate oluştur
+     * Parses an [X509Certificate] from a PEM-encoded input stream.
      */
     fun certificateFromPem(pemInputStream: InputStream): X509Certificate {
         val certificateFactory = CertificateFactory.getInstance("X.509")
@@ -22,7 +22,7 @@ object SSLHelper {
     }
 
     /**
-     * Verilen sertifikalarla özel TrustManager oluştur
+     * Creates an [X509TrustManager] trusting the provided [certificates].
      */
     fun createTrustManager(vararg certificates: X509Certificate): X509TrustManager {
         val keyStore = KeyStore.getInstance(KeyStore.getDefaultType()).apply {
@@ -47,7 +47,7 @@ object SSLHelper {
     }
 
     /**
-     * TrustManager ile SSLContext oluştur
+     * Creates a TLS [SSLContext] initialized with the specified [trustManager].
      */
     fun createSSLContext(trustManager: X509TrustManager): SSLContext {
         return SSLContext.getInstance("TLS").apply {
@@ -56,7 +56,7 @@ object SSLHelper {
     }
 
     /**
-     * Verilen sertifikalarla SSLConfig oluştur
+     * Creates an [SSLConfig] trusting only the provided [certificates].
      */
     fun createSSLConfig(vararg certificates: X509Certificate): SSLConfig {
         val trustManager = createTrustManager(*certificates)

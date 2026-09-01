@@ -155,6 +155,54 @@ Token veya header eklemek için kullanılır. Token sağlayıcınız `suspend` f
 addInterceptor(AuthInterceptor(headerName = "Authorization") { tokenProvider() })
 ```
 
+### Token Authenticator (401 Otomatik Yenileme)
+Sunucudan 401 Unauthorized yanıtı geldiğinde, token'ı arka planda otomatik yenileyip isteği yineler. Mutex tabanlı eşzamanlılık koruması sayesinde aynı anda birden fazla istek 401 alsa bile yenileme fonksiyonu yalnızca **1 kez** çalıştırılır:
+```kotlin
+val client = httpClient {
+    baseUrl = "https://api.example.com/"
+
+    tokenAuthenticator(
+        currentToken = { userPreferences.getAccessToken() },
+        onRefreshToken = { expiredToken ->
+            val newSession = authApi.refreshToken(expiredToken)
+            userPreferences.saveAccessToken(newSession.accessToken)
+            newSession.accessToken // Başarılıysa yeni token döner, başarısızsa null döner
+        }
+    )
+}
+```
+
+### Retry Yapılandırması (Yeniden Deneme)
+Ağ kopmaları (-1), 5xx sunucu hataları veya 429 Too Many Requests durumlarında **exponential backoff** ve **random jitter** ile otomatik yeniden deneme yapar.
+> **Not:** Varsayılan olarak hem istemci hem de metot seviyesinde retry kapalıdır (`noRetry`). İstediğiniz yerde opt-in olarak açabilirsiniz.
+
+#### 1. İstemci Düzeyinde Varsayılan Retry:
+```kotlin
+val client = httpClient {
+    baseUrl = "https://api.example.com/"
+
+    retryConfig {
+        maxRetries = 3
+        initialDelayMs = 1000L
+        backoffMultiplier = 2.0
+        jitter = true
+    }
+}
+```
+
+#### 2. İstek (Metot) Düzeyinde Retry Açma / Ezme:
+```kotlin
+// İstemcide retry olmasa bile bu istek için retry açar:
+client.get<WeatherResponse>("weather") {
+    retry(maxRetries = 5, initialDelayMs = 500L)
+}
+
+// İstemcide retry açık olsa bile bu istek için retry'ı tamamen kapatır:
+client.post<PaymentResponse>("checkout") {
+    noRetry()
+}
+```
+
 ---
 
 ## SSL/TLS Yapılandırması
@@ -201,9 +249,9 @@ Ergonomi yardımcıları:
 ---
 
 ## Yol Haritası
-- TokenAuthenticator(Authenticator interface and override authenticate)
-- RetryInterceptor (exponential backoff, idempotent metodlar)
-- CacheInterceptor (ETag, Cache-Control, disk/memory)
+- [x] TokenAuthenticator (Authenticator arayüzü, BearerTokenAuthenticator ve 401 Mutex retry)
+- [x] RetryInterceptor (Exponential backoff, jitter, client ve istek bazlı özelleştirilebilir retry)
+- [ ] CacheInterceptor (ETag, Cache-Control, disk/memory)
 - Multipart/Form-Data (dosya upload)
 - Progress takibi (upload/download)
 - TimeoutInterceptor (call-level timeout)

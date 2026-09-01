@@ -64,5 +64,8 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 
-    implementation(libs.gnetwork)
+//    For Maven Local
+//    implementation(libs.gnetwork)
+
+    implementation(project(":GNetwork"))
 }

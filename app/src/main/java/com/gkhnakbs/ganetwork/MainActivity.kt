@@ -52,6 +52,47 @@ class MainActivity : ComponentActivity() {
                 this["connection"] = "Keep-Alive"
             }
 
+            /*
+             * ═══════════════════════════════════════════════════════════════════════════════════
+             * REAL-WORLD DI SCENARIO (e.g., Hilt / Koin):
+             *
+             * @Provides
+             * @Singleton
+             * fun provideHttpClient(
+             *     tokenManager: TokenManager,         // DataStore / EncryptedSharedPreferences
+             *     authApiService: Provider<AuthApi>,  // Provider/Lazy prevents circular DI dependency
+             * ): HttpClient = httpClient {
+             *     baseUrl = "https://api.example.com/"
+             *
+             *     // 1. ATTACH TOKEN: Automatically attaches current token to outgoing requests
+             *     addInterceptor(AuthInterceptor { tokenManager.getAccessToken() })
+             *
+             *     // 2. REFRESH & RETRY: Triggers only on 401 Unauthorized (Mutex-protected)
+             *     tokenAuthenticator(
+             *         currentToken = { tokenManager.getAccessToken() },
+             *         onRefreshToken = { expiredToken ->
+             *             val refreshResult = authApiService.get().refreshToken(
+             *                 refreshToken = tokenManager.getRefreshToken()
+             *             )
+             *             if (refreshResult is HttpResponse.Success) {
+             *                 val newAccessToken = refreshResult.body.accessToken
+             *                 tokenManager.saveTokens(newAccessToken, refreshResult.body.refreshToken)
+             *                 newAccessToken // Retries original request with this new token
+             *             } else {
+             *                 tokenManager.clearSession() // Refresh failed -> prompt user to login
+             *                 null // Aborts retry and propagates 401 to caller
+             *             }
+             *         }
+             *     )
+             *
+             *     addInterceptor(LoggingInterceptor(level = LoggingInterceptor.Level.BODY))
+             * }
+             * ═══════════════════════════════════════════════════════════════════════════════════
+             */
+
+            // Optional sample configuration for open-meteo (public API, no auth required):
+            // tokenAuthenticator { expiredToken -> null }
+
             // addInterceptor(AuthInterceptor(headerName = "Authorization") { null /* ex. "Bearer token" */ })
             addInterceptor(
                 LoggingInterceptor(

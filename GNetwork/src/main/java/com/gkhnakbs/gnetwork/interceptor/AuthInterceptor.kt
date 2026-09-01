@@ -1,7 +1,10 @@
 package com.gkhnakbs.gnetwork.interceptor
 
 /**
- * Basit Auth interceptor: sabit header veya token sağlayıcı ile ekleme yapar.
+ * Interceptor that appends an authentication token to outgoing requests.
+ *
+ * @property headerName The name of the authentication header (defaults to "Authorization").
+ * @property tokenProvider Suspend function providing the latest authentication token, or null if unauthenticated.
  */
 class AuthInterceptor(
     private val headerName: String = "Authorization",

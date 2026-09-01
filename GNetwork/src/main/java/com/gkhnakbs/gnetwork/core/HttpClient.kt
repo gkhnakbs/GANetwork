@@ -20,15 +20,26 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.serializer
 import java.net.HttpURLConnection
 import java.net.URI
-import java.net.http.HttpClient
+import com.gkhnakbs.gnetwork.auth.Authenticator
 import javax.net.ssl.HttpsURLConnection
 import javax.net.ssl.SSLPeerUnverifiedException
 import kotlin.coroutines.resume
 
 /**
+ * Core HTTP client responsible for orchestrating network requests, interceptor pipelines,
+ * serialization, and authentication handling.
+ *
+ * Built on standard Java [HttpURLConnection] and Kotlin Coroutines.
+ *
+ * @property defaultHeaders Common HTTP headers applied to all outgoing requests.
+ * @property baseUrl Base URL prepended to relative request paths.
+ * @property json Configured [Json] instance for serialization and deserialization.
+ * @property interceptors Ordered list of [Interceptor] instances applied to every request.
+ * @property sslConfig SSL/TLS security settings including custom trust managers and certificate pinning.
+ * @property authenticator Authenticator invoked when encountering 401 Unauthorized responses.
+ *
  * Created by Gökhan Akbaş on 12/11/2025.
  */
-
 class HttpClient(
     val defaultHeaders: Map<String, String> = emptyMap(),
     val baseUrl: String = "",
@@ -40,11 +51,21 @@ class HttpClient(
     },
     private val interceptors: List<Interceptor> = emptyList(),
     private val sslConfig: SSLConfig = SSLConfig.default(),
+    val authenticator: Authenticator = Authenticator.NONE,
 ) {
+    /**
+     * Executes the given [request] and deserializes the successful response into [T].
+     *
+     * @param request The [HttpRequest] specification to send.
+     * @return [HttpResponse] representing either [HttpResponse.Success], [HttpResponse.Failure], or [HttpResponse.Error].
+     */
     suspend inline fun <reified T> execute(request: HttpRequest): HttpResponse<T> {
         return executeWithSerializer(request, serializer<T>())
     }
 
+    /**
+     * Executes the request through the interceptor pipeline and parses the result with [serializer].
+     */
     @PublishedApi
     internal suspend fun <T> executeWithSerializer(
         request: HttpRequest,
@@ -56,7 +77,21 @@ class HttpClient(
             index = 0,
             request = startRequest
         )
-        val raw = chain.proceed(startRequest)
+        var raw = chain.proceed(startRequest)
+
+        // 401 Unauthorized durumunda Authenticator ile yeniden deneme (tekrar döngüye girmemesi için 1 kez denenir)
+        if (raw.statusCode == 401 && authenticator != Authenticator.NONE) {
+            val retryRequest = authenticator.authenticate(startRequest, raw)
+            if (retryRequest != null) {
+                val retryChain = RealInterceptorChain(
+                    interceptors = interceptors + TerminalInterceptor(::performNetworkCall),
+                    index = 0,
+                    request = retryRequest
+                )
+                raw = retryChain.proceed(retryRequest)
+            }
+        }
+
         return@withContext parseRawResponse(raw, serializer)
     }
 
@@ -155,6 +190,9 @@ class HttpClient(
         }
     }
 
+    /**
+     * Opens and configures an [HttpURLConnection] for the specified [request].
+     */
     @PublishedApi
     internal fun buildConnection(request: HttpRequest): HttpURLConnection {
         val connection = URI(request.url).toURL().openConnection() as HttpURLConnection
@@ -188,7 +226,6 @@ class HttpClient(
         return connection
     }
 
-    
     private fun applySSLConfig(connection: HttpsURLConnection) {
         // SSLSocketFactory uygula
         sslConfig.sslSocketFactory?.let { factory ->
@@ -213,6 +250,9 @@ class HttpClient(
         }
     }
 
+    /**
+     * Serializes and writes the request body to the connection's output stream.
+     */
     @PublishedApi
     internal fun writeRequestBody(connection: HttpURLConnection, request: HttpRequest) {
         val body = request.body ?: return
@@ -234,6 +274,9 @@ class HttpClient(
         connection.outputStream.buffered().use { it.write(bytes); it.flush() }
     }
 
+    /**
+     * Extracts response headers from the [connection] into a [ResponseHeaders] instance.
+     */
     @PublishedApi
     internal fun parseResponseHeaders(connection: HttpURLConnection): ResponseHeaders {
         val headers = connection.headerFields.filterKeys { it != null }.mapKeys { it.key!! }
