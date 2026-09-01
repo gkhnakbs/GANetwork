@@ -19,14 +19,11 @@ data class ResponseHeaders(
 
     /** Returns all values associated with [key]. */
     fun getAll(key: String): List<String> = headers[key] ?: emptyList()
-}
 
-/**
- * Returns the first header value matching [name] case-insensitively.
- */
-@PublishedApi
-internal fun ResponseHeaders.firstIgnoreCase(name: String): String? =
-    headers.entries.firstOrNull { it.key.equals(name, ignoreCase = true) }?.value?.firstOrNull()
+    /** Returns the first value matching [name] case-insensitively, or null if absent. */
+    fun firstIgnoreCase(name: String): String? =
+        headers.entries.firstOrNull { it.key.equals(name, ignoreCase = true) }?.value?.firstOrNull()
+}
 
 /**
  * Extracts the [Charset] defined in the `Content-Type` header, if any.

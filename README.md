@@ -203,6 +203,33 @@ client.post<PaymentResponse>("checkout") {
 }
 ```
 
+### HTTP Önbellekleme (Cache & ETag)
+Standart HTTP `Cache-Control` (`max-age`, `no-store`) ve `ETag` (`If-None-Match`, `304 Not Modified`) kurallarına göre çalışan bellek içi (In-Memory LRU) önbellekleme desteği sunar.
+> **Not:** Varsayılan olarak önbellekleme tamamen kapalıdır (`null`). İhtiyaç duyulan istemcilerde `memoryCache(...)` ile kolayca açılabilir.
+
+#### 1. İstemci Düzeyinde Önbellek Tanımlama (10 MB LRU):
+```kotlin
+val client = httpClient {
+    baseUrl = "https://api.example.com/"
+
+    // 10 MB bellek içi LRU önbelleği aktif eder
+    memoryCache(maxSizeBytes = 10 * 1024 * 1024L)
+}
+```
+
+#### 2. İstek (Metot) Düzeyinde Önbellek Politikası (CachePolicy):
+```kotlin
+// Pull-to-Refresh: Önbelleği pas geç, doğrudan ağdan en günceli getir ve önbelleğe yaz
+client.get<WeatherResponse>("weather") {
+    forceNetwork()
+}
+
+// Çevrimdışı Mod: Sadece önbellekten oku, ağa gitme (yoksa 504 Gateway Timeout döner)
+client.get<WeatherResponse>("weather") {
+    forceCache()
+}
+```
+
 ---
 
 ## SSL/TLS Yapılandırması
@@ -251,8 +278,8 @@ Ergonomi yardımcıları:
 ## Yol Haritası
 - [x] TokenAuthenticator (Authenticator arayüzü, BearerTokenAuthenticator ve 401 Mutex retry)
 - [x] RetryInterceptor (Exponential backoff, jitter, client ve istek bazlı özelleştirilebilir retry)
-- [ ] CacheInterceptor (ETag, Cache-Control, disk/memory)
-- Multipart/Form-Data (dosya upload)
+- [x] CacheInterceptor (ETag, Cache-Control, In-Memory LRU Cache, 304 Not Modified, CachePolicy)
+- [ ] Multipart/Form-Data (dosya upload)
 - Progress takibi (upload/download)
 - TimeoutInterceptor (call-level timeout)
 - Metrics/AnalyticsInterceptor

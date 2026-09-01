@@ -2,6 +2,9 @@ package com.gkhnakbs.gnetwork.core
 
 import com.gkhnakbs.gnetwork.auth.Authenticator
 import com.gkhnakbs.gnetwork.auth.BearerTokenAuthenticator
+import com.gkhnakbs.gnetwork.cache.Cache
+import com.gkhnakbs.gnetwork.cache.CacheInterceptor
+import com.gkhnakbs.gnetwork.cache.MemoryLruCache
 import com.gkhnakbs.gnetwork.retry.RetryConfig
 import com.gkhnakbs.gnetwork.retry.RetryConfigBuilder
 import com.gkhnakbs.gnetwork.retry.RetryInterceptor
@@ -20,6 +23,7 @@ class HttpClientBuilder {
     private var sslConfig: SSLConfig = SSLConfig.default()
     private var authenticator: Authenticator = Authenticator.NONE
     private var retryConfig: RetryConfig? = null
+    private var cache: Cache? = null
 
     /**
      * Configures default HTTP headers applied to all outgoing requests.
@@ -94,6 +98,22 @@ class HttpClientBuilder {
     }
 
     /**
+     * Sets a custom [Cache] implementation for HTTP response caching (disabled by default).
+     */
+    fun cache(cache: Cache) = apply {
+        this.cache = cache
+    }
+
+    /**
+     * Enables an in-memory LRU cache with the specified byte size limit (defaults to 10 MB).
+     *
+     * @param maxSizeBytes Maximum cache size in bytes (defaults to 10 MB).
+     */
+    fun memoryCache(maxSizeBytes: Long = 10 * 1024 * 1024L) = apply {
+        this.cache = MemoryLruCache(maxSizeBytes)
+    }
+
+    /**
      * Sets the [SSLConfig] for HTTPS connections.
      */
     fun sslConfig(config: SSLConfig) = apply {
@@ -114,6 +134,10 @@ class HttpClientBuilder {
         val allInterceptors = mutableListOf<com.gkhnakbs.gnetwork.interceptor.Interceptor>()
         // RetryInterceptor sits at the head of the pipeline to re-execute subsequent interceptors upon retry
         allInterceptors.add(RetryInterceptor(defaultConfig = retryConfig))
+
+        // CacheInterceptor sits after retry: if response is fresh/cached, it short-circuits network calls
+        cache?.let { allInterceptors.add(CacheInterceptor(it)) }
+
         allInterceptors.addAll(interceptors)
 
         return HttpClient(

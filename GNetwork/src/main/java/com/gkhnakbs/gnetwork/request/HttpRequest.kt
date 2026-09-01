@@ -1,5 +1,6 @@
 package com.gkhnakbs.gnetwork.request
 
+import com.gkhnakbs.gnetwork.cache.CachePolicy
 import com.gkhnakbs.gnetwork.core.HttpMethod
 import com.gkhnakbs.gnetwork.retry.RetryConfig
 
@@ -14,6 +15,7 @@ import com.gkhnakbs.gnetwork.retry.RetryConfig
  * @property body Optional request payload string.
  * @property contentType Optional [ContentType] specifying the request body format.
  * @property retryConfig Optional per-request [RetryConfig] overriding the client's default retry behavior.
+ * @property cachePolicy Policy controlling local cache interaction for this request (defaults to [CachePolicy.DEFAULT]).
  *
  * Created by Gökhan Akbaş on 12/11/2025.
  */
@@ -26,4 +28,5 @@ data class HttpRequest(
     val body: String? = null,
     val contentType: ContentType? = null,
     val retryConfig: RetryConfig? = null,
+    val cachePolicy: CachePolicy = CachePolicy.DEFAULT,
 )

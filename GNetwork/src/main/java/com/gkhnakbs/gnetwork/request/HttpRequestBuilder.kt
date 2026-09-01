@@ -1,5 +1,6 @@
 package com.gkhnakbs.gnetwork.request
 
+import com.gkhnakbs.gnetwork.cache.CachePolicy
 import com.gkhnakbs.gnetwork.core.HttpMethod
 import com.gkhnakbs.gnetwork.interceptor.RawResponse
 import com.gkhnakbs.gnetwork.retry.RetryConfig
@@ -19,6 +20,7 @@ class HttpRequestBuilder {
     private var body: String? = null
     private var contentType: ContentType? = null
     private var retryConfig: RetryConfig? = null
+    private var cachePolicy: CachePolicy = CachePolicy.DEFAULT
 
     /**
      * Adds an HTTP header.
@@ -154,6 +156,27 @@ class HttpRequestBuilder {
     }
 
     /**
+     * Sets the [CachePolicy] for this specific request.
+     */
+    fun cachePolicy(policy: CachePolicy) {
+        this.cachePolicy = policy
+    }
+
+    /**
+     * Forces the request to bypass the cache and fetch fresh data from the network.
+     */
+    fun forceNetwork() {
+        this.cachePolicy = CachePolicy.FORCE_NETWORK
+    }
+
+    /**
+     * Forces the request to only return from cache, failing with 504 if not cached.
+     */
+    fun forceCache() {
+        this.cachePolicy = CachePolicy.FORCE_CACHE
+    }
+
+    /**
      * Validates and builds the immutable [HttpRequest].
      */
     fun build(): HttpRequest {
@@ -168,6 +191,7 @@ class HttpRequestBuilder {
             body = body,
             contentType = contentType,
             retryConfig = retryConfig,
+            cachePolicy = cachePolicy,
         )
     }
 
