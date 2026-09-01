@@ -20,6 +20,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.serializer
 import java.net.HttpURLConnection
 import java.net.URI
+import java.net.http.HttpClient
 import javax.net.ssl.HttpsURLConnection
 import javax.net.ssl.SSLPeerUnverifiedException
 import kotlin.coroutines.resume
@@ -168,16 +169,26 @@ class HttpClient(
             connectTimeout = request.connectTimeout
             readTimeout = request.readTimeout
             doInput = true
+            useCaches = false
             instanceFollowRedirects = true
             doOutput = request.body != null && request.method.allowsBody
-            if (getRequestProperty("Accept-Encoding") == null) {
-                setRequestProperty("Accept-Encoding", "gzip")
-            }
         }
+
+        // Önce custom header'ları uygula, sonra eksikleri tamamla
         request.headers.forEach { (k, v) -> connection.setRequestProperty(k, v) }
+
+        // Header isimleri case-insensitive karşılaştır
+        val hasAcceptEncoding = connection.requestProperties.keys
+            .any { it.equals("Accept-Encoding", ignoreCase = true) }
+
+        if (!hasAcceptEncoding) {
+            connection.setRequestProperty("Accept-Encoding", "gzip")
+        }
+
         return connection
     }
 
+    
     private fun applySSLConfig(connection: HttpsURLConnection) {
         // SSLSocketFactory uygula
         sslConfig.sslSocketFactory?.let { factory ->

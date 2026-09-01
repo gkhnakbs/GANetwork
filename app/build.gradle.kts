@@ -2,16 +2,13 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
 }
 
 android {
     namespace = "com.gkhnakbs.ganetwork"
-    compileSdk {
-        version = release(36)
-    }
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.gkhnakbs.ganetwork"
@@ -25,7 +22,11 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            optimization {
+                enable = true
+            }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
