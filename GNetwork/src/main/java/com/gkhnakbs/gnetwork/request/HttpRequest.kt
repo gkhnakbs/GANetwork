@@ -17,6 +17,8 @@ import com.gkhnakbs.gnetwork.retry.RetryConfig
  * @property contentType Optional [ContentType] specifying the request body format.
  * @property retryConfig Optional per-request [RetryConfig] overriding the client's default retry behavior.
  * @property cachePolicy Policy controlling local cache interaction for this request (defaults to [CachePolicy.DEFAULT]).
+ * @property onUploadProgress Optional callback periodically receiving [Progress] updates during request body upload.
+ * @property onDownloadProgress Optional callback periodically receiving [Progress] updates during response download.
  *
  * Created by Gökhan Akbaş on 12/11/2025.
  */
@@ -31,6 +33,8 @@ data class HttpRequest(
     val contentType: ContentType? = null,
     val retryConfig: RetryConfig? = null,
     val cachePolicy: CachePolicy = CachePolicy.DEFAULT,
+    val onUploadProgress: ((com.gkhnakbs.gnetwork.progress.Progress) -> Unit)? = null,
+    val onDownloadProgress: ((com.gkhnakbs.gnetwork.progress.Progress) -> Unit)? = null,
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true

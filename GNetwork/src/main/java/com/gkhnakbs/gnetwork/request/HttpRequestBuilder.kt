@@ -3,6 +3,7 @@ package com.gkhnakbs.gnetwork.request
 import com.gkhnakbs.gnetwork.cache.CachePolicy
 import com.gkhnakbs.gnetwork.core.HttpMethod
 import com.gkhnakbs.gnetwork.interceptor.RawResponse
+import com.gkhnakbs.gnetwork.progress.Progress
 import com.gkhnakbs.gnetwork.retry.RetryConfig
 import com.gkhnakbs.gnetwork.retry.RetryConfigBuilder
 import java.net.URLEncoder
@@ -22,6 +23,8 @@ class HttpRequestBuilder {
     private var contentType: ContentType? = null
     private var retryConfig: RetryConfig? = null
     private var cachePolicy: CachePolicy = CachePolicy.DEFAULT
+    private var onUploadProgress: ((Progress) -> Unit)? = null
+    private var onDownloadProgress: ((Progress) -> Unit)? = null
 
     /**
      * Adds an HTTP header.
@@ -212,6 +215,24 @@ class HttpRequestBuilder {
     }
 
     /**
+     * Sets a progress callback listener for tracking upload progress of request body or multipart data.
+     *
+     * @param listener Lambda periodically invoked with [Progress] details (bytesTransferred, totalBytes, percentage).
+     */
+    fun onUploadProgress(listener: (Progress) -> Unit) {
+        this.onUploadProgress = listener
+    }
+
+    /**
+     * Sets a progress callback listener for tracking download progress of response payload.
+     *
+     * @param listener Lambda periodically invoked with [Progress] details (bytesTransferred, totalBytes, percentage).
+     */
+    fun onDownloadProgress(listener: (Progress) -> Unit) {
+        this.onDownloadProgress = listener
+    }
+
+    /**
      * Validates and builds the immutable [HttpRequest].
      */
     fun build(): HttpRequest {
@@ -228,6 +249,8 @@ class HttpRequestBuilder {
             contentType = contentType,
             retryConfig = retryConfig,
             cachePolicy = cachePolicy,
+            onUploadProgress = onUploadProgress,
+            onDownloadProgress = onDownloadProgress,
         )
     }
 

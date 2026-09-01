@@ -251,6 +251,28 @@ val response = client.post<UploadResponse>("api/v1/student/upload") {
 }
 ```
 
+### Progress Tracking (İlerleme Dinleyicisi)
+Büyük dosya yüklemeleri (upload) veya yanıt indirmeleri (download) sırasında kullanıcı arayüzünü (ProgressBar / yüzde) anlık olarak güncellemek için kullanılır. `Progress` nesnesi üzerinden aktarılan bayt, toplam bayt ve yüzde bilgisine erişebilirsiniz.
+
+```kotlin
+// 1. Yükleme (Upload) İlerleme Takibi:
+client.post<UploadResponse>("api/v1/student/upload") {
+    multipartBody {
+        part("documentFile", pdfFile)
+    }
+    onUploadProgress { progress ->
+        Log.d("Upload", "Yükleniyor: %${progress.percentage} (${progress.bytesTransferred}/${progress.totalBytes})")
+    }
+}
+
+// 2. İndirme (Download) İlerleme Takibi:
+client.get<String>("api/v1/reports/annual.pdf") {
+    onDownloadProgress { progress ->
+        Log.d("Download", "İndiriliyor: %${progress.percentage}")
+    }
+}
+```
+
 ---
 
 ## SSL/TLS Yapılandırması
@@ -301,8 +323,8 @@ Ergonomi yardımcıları:
 - [x] RetryInterceptor (Exponential backoff, jitter, client ve istek bazlı özelleştirilebilir retry)
 - [x] CacheInterceptor (ETag, Cache-Control, In-Memory LRU Cache, 304 Not Modified, CachePolicy)
 - [x] Multipart/Form-Data (Dosya, görsel, binary ve form alanları yükleme desteği)
-- [ ] Progress takibi (upload/download)
-- TimeoutInterceptor (call-level timeout)
+- [x] Progress takibi (Upload ve download anlık ilerleme dinleyicisi: yüzde, bayt, tamamlama)
+- [ ] TimeoutInterceptor (call-level timeout)
 - Metrics/AnalyticsInterceptor
 - Redirect yönetimi (307/308 method/body preservation)
 

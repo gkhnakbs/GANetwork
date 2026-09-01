@@ -21,6 +21,7 @@ import kotlinx.serialization.serializer
 import java.net.HttpURLConnection
 import java.net.URI
 import com.gkhnakbs.gnetwork.auth.Authenticator
+import com.gkhnakbs.gnetwork.progress.Progress
 import javax.net.ssl.HttpsURLConnection
 import javax.net.ssl.SSLPeerUnverifiedException
 import kotlin.coroutines.resume
@@ -122,7 +123,31 @@ class HttpClient(
                 val input =
                     runCatching { connection.inputStream }.getOrNull() ?: connection.errorStream
                 val stream = if (input != null) wrapIfCompressed(input, headers) else null
-                val bytes = stream?.buffered()?.use { it.readBytes() } ?: ByteArray(0)
+                val downloadListener = request.onDownloadProgress
+
+                val bytes = if (stream != null) {
+                    if (downloadListener != null) {
+                        val contentLength = connection.contentLengthLong.takeIf { it >= 0 }
+                            ?: headers.firstIgnoreCase("Content-Length")?.toLongOrNull()
+                            ?: -1L
+                        val buffer = ByteArray(8192)
+                        val output = java.io.ByteArrayOutputStream()
+                        var bytesRead = 0L
+                        stream.use { inStream ->
+                            var read: Int
+                            while (inStream.read(buffer).also { read = it } != -1) {
+                                output.write(buffer, 0, read)
+                                bytesRead += read
+                                downloadListener(Progress(bytesRead, contentLength))
+                            }
+                        }
+                        output.toByteArray()
+                    } else {
+                        stream.buffered().use { it.readBytes() }
+                    }
+                } else {
+                    ByteArray(0)
+                }
 
                 cont.resume(
                     RawResponse(
@@ -269,7 +294,24 @@ class HttpClient(
             connection.setRequestProperty("Content-Type", finalCT)
         }
         connection.setFixedLengthStreamingMode(bytes.size)
-        connection.outputStream.buffered().use { it.write(bytes); it.flush() }
+        val uploadListener = request.onUploadProgress
+        if (uploadListener != null) {
+            val totalBytes = bytes.size.toLong()
+            val buffer = ByteArray(8192)
+            var bytesWritten = 0L
+            val inputStream = java.io.ByteArrayInputStream(bytes)
+            connection.outputStream.buffered().use { output ->
+                var read: Int
+                while (inputStream.read(buffer).also { read = it } != -1) {
+                    output.write(buffer, 0, read)
+                    bytesWritten += read
+                    uploadListener(Progress(bytesWritten, totalBytes))
+                }
+                output.flush()
+            }
+        } else {
+            connection.outputStream.buffered().use { it.write(bytes); it.flush() }
+        }
     }
 
     /**
