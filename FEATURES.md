@@ -20,26 +20,38 @@ A lightweight, production-ready, pure Kotlin/JVM HTTP client library built from 
 
 ## 1. Core Engine & Coroutines Architecture
 
-* **Zero Heavy HTTP Dependencies:** Built directly on top of `java.net.HttpURLConnection`, avoiding large binary overhead from third-party engines.
-* **Coroutines First:** All network operations execute asynchronously on `Dispatchers.IO`. Uses `suspendCancellableCoroutine` for non-blocking I/O.
-* **Cooperative Cancellation:** When a coroutine scope is cancelled or timed out, `connection.disconnect()` is immediately triggered to abort the socket and free system sockets without leaks.
-* **Kotlinx Serialization:** Deep integration with `kotlinx.serialization.json.Json`. Automatic charset resolution from `Content-Type` with UTF-8 fallback.
+* **Zero Heavy HTTP Dependencies:** Built directly on top of standard `java.net.HttpURLConnection`, avoiding large binary overhead from third-party engines.
+* **Coroutines First & Cooperative Cancellation:** All network operations execute asynchronously on `Dispatchers.IO` using `suspendCancellableCoroutine`. Cancellation signals (`CancellationException`) are propagated cleanly, and `connection.disconnect()` immediately aborts underlying sockets to prevent resource leaks.
+* **Multi-Format Deserialization:**
+  - **Dynamic Models:** Any custom data class annotated with `@Serializable` is automatically parsed using `kotlinx.serialization.json.Json`.
+  - **Raw Text (`String`):** Unparsed plain text/HTML without JSON decoding overhead.
+  - **Binary Downloads (`ByteArray`):** Direct binary payload retrieval for images, PDFs, audio, and documents.
+  - **Empty Responses (`Unit`):** Zero-overhead handling for endpoints returning `204 No Content` or empty bodies.
 * **Type-Safe Result Hierarchy:**
   - `HttpResponse.Success<T>`: HTTP 2xx with deserialized typed body, headers, and raw string response.
   - `HttpResponse.Failure<T>`: HTTP non-2xx (4xx, 5xx) with status code, message, headers, and raw error body.
-  - `HttpResponse.Error<T>`: Network or system exceptions (DNS failures, connection aborts, timeouts).
+  - `HttpResponse.Error<T>`: Network or system exceptions (DNS failures, connection aborts, socket & call timeouts via `isTimeout`).
+* **Ergonomic Functional Extensions (`HttpResponseExtensions`):**
+  - Chainable handlers: `.onSuccess { ... }`, `.onFailure { ... }`, `.onError { ... }`
+  - Safe unwrapping: `.getOrNull()`, `.getOrDefault(default)`, `.getOrThrow()`
+  - Transformations: `.map { ... }`, `.fold(onSuccess, onFailure, onError)`
 
 ```kotlin
 val client = httpClient {
     baseUrl = "https://api.example.com/"
 }
 
-val response: HttpResponse<UserDto> = client.get("users/1001")
-when (response) {
-    is HttpResponse.Success -> println("User: ${response.body.name}")
-    is HttpResponse.Failure -> println("HTTP ${response.statusCode}: ${response.errorMessage}")
-    is HttpResponse.Error   -> println("Network error: ${response.exception.message}")
-}
+// 1. Typed JSON request with fluent chaining:
+client.get<UserDto>("users/1001")
+    .onSuccess { user -> println("User loaded: ${user.name}") }
+    .onFailure { fail -> println("Server error ${fail.statusCode}: ${fail.errorMessage}") }
+    .onError { err -> if (err.isTimeout) println("Request timed out!") }
+
+// 2. Direct binary download (ByteArray):
+val imageBytes: ByteArray? = client.get<ByteArray>("avatar.png").getOrNull()
+
+// 3. Void endpoint (Unit / 204 No Content):
+client.post<Unit>("auth/logout").onSuccess { println("Logged out successfully") }
 ```
 
 ---

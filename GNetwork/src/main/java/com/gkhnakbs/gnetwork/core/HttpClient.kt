@@ -22,6 +22,7 @@ import java.net.HttpURLConnection
 import java.net.URI
 import com.gkhnakbs.gnetwork.auth.Authenticator
 import com.gkhnakbs.gnetwork.progress.Progress
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withTimeout
 import java.util.concurrent.TimeoutException
@@ -188,6 +189,7 @@ class HttpClient(
                     )
                 )
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 cont.resume(
                     RawResponse(
                         statusCode = -1,
@@ -215,9 +217,13 @@ class HttpClient(
             in 200..299 -> {
                 try {
                     val body: T = when {
-                        // String ise direkt döndür
+                        // String ise direkt metin olarak döndür
                         serializer.descriptor.serialName == "kotlin.String" -> rawText as T
-                        // JSON ise deserialize
+                        // ByteArray ise doğrudan ham baytları döndür (dosya/görsel indirimi)
+                        serializer.descriptor.serialName == "kotlin.ByteArray" -> bytes as T
+                        // Unit ise boş yanıt veya 204 No Content durumunu karşıla
+                        serializer.descriptor.serialName == "kotlin.Unit" -> Unit as T
+                        // JSON ise deserialize et
                         headers.isJson() -> json.decodeFromString(serializer, rawText)
                         else -> throw IllegalStateException("Unsupported content type for ${serializer.descriptor.serialName}")
                     }

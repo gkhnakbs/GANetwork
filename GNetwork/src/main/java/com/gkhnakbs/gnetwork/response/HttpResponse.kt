@@ -3,6 +3,8 @@ package com.gkhnakbs.gnetwork.response
 import java.io.IOException
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
+import java.util.concurrent.TimeoutException
+import kotlinx.coroutines.TimeoutCancellationException
 
 /**
  * Represents the outcome of an HTTP execution.
@@ -80,7 +82,10 @@ sealed class HttpResponse<out T> {
                         exception is SocketTimeoutException ||
                         exception is IOException
 
-        /** True if the failure is specifically a timeout. */
-        val isTimeout: Boolean get() = exception is SocketTimeoutException
+        /** True if the failure is specifically a socket or call-level timeout. */
+        val isTimeout: Boolean
+            get() = exception is SocketTimeoutException ||
+                    exception is TimeoutException ||
+                    exception is TimeoutCancellationException
     }
 }
