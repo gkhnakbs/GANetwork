@@ -6,6 +6,7 @@ import com.gkhnakbs.gnetwork.interceptor.RawResponse
 import com.gkhnakbs.gnetwork.progress.Progress
 import com.gkhnakbs.gnetwork.retry.RetryConfig
 import com.gkhnakbs.gnetwork.retry.RetryConfigBuilder
+import java.io.File
 import java.net.URLEncoder
 import kotlin.time.Duration
 
@@ -156,6 +157,18 @@ class HttpRequestBuilder {
         this.rawBody = bytes
         this.body = null
         header("Content-Type", contentType)
+    }
+
+    /**
+     * Sets a file from disk as the raw binary request body with automatic MIME detection.
+     *
+     * @param file The file on disk to upload.
+     * @param contentType Optional MIME content type. If null, automatically inferred from [File.getName].
+     */
+    fun fileBody(file: File, contentType: String? = null) {
+        require(file.exists() && file.isFile) { "File does not exist or is a directory: ${file.absolutePath}" }
+        val mime = contentType ?: MimeTypeHelper.detectMimeType(file.name)
+        binaryBody(file.readBytes(), mime)
     }
 
     /**

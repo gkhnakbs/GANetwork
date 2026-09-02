@@ -179,13 +179,16 @@ class MultipartBodyBuilder {
 
             when (part) {
                 is MultipartPart.FormField -> {
-                    val header = "Content-Disposition: form-data; name=\"${part.name}\"\r\n\r\n"
+                    val safeName = part.name.replace("\"", "%22")
+                    val header = "Content-Disposition: form-data; name=\"$safeName\"\r\n\r\n"
                     outputStream.write(header.toByteArray(Charsets.UTF_8))
                     outputStream.write(part.value.toByteArray(Charsets.UTF_8))
                     outputStream.write(crlf)
                 }
                 is MultipartPart.FilePart -> {
-                    val header = "Content-Disposition: form-data; name=\"${part.name}\"; filename=\"${part.filename}\"\r\n" +
+                    val safeName = part.name.replace("\"", "%22")
+                    val safeFilename = part.filename.replace("\"", "%22")
+                    val header = "Content-Disposition: form-data; name=\"$safeName\"; filename=\"$safeFilename\"\r\n" +
                             "Content-Type: ${part.contentType}\r\n\r\n"
                     outputStream.write(header.toByteArray(Charsets.UTF_8))
                     outputStream.write(part.bytes)

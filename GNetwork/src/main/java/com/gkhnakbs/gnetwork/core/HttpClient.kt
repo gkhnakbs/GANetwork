@@ -172,6 +172,10 @@ class HttpClient(
                                 downloadListener(Progress(bytesRead, contentLength))
                             }
                         }
+                        // Emit final completion progress if not already completed (e.g., chunked transfer without Content-Length)
+                        if (contentLength < 0L || bytesRead != contentLength) {
+                            downloadListener(Progress(bytesRead, bytesRead))
+                        }
                         output.toByteArray()
                     } else {
                         stream.buffered().use { it.readBytes() }

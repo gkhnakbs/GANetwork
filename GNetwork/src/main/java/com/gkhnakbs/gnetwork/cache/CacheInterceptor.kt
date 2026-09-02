@@ -27,9 +27,14 @@ class CacheInterceptor(
     override suspend fun intercept(chain: Interceptor.Chain): RawResponse {
         val request = chain.request
 
-        // Caching is strictly limited to idempotent read operations (GET)
+        // Caching is strictly limited to idempotent read operations (GET).
+        // For non-safe methods (POST, PUT, DELETE), execute the request and invalidate cached URL upon success per RFC 7234 Section 4.4.
         if (request.method != HttpMethod.GET) {
-            return chain.proceed(request)
+            val response = chain.proceed(request)
+            if (response.statusCode in 200..299) {
+                cache.remove(request.url)
+            }
+            return response
         }
 
         val cacheKey = request.url
@@ -47,12 +52,13 @@ class CacheInterceptor(
         return if (cached != null) {
             withCacheHeader(cached.toRawResponse(), "HIT")
         } else {
-            RawResponse(
+            val missingResponse = RawResponse(
                 statusCode = 504,
                 message = "Unsatisfiable Request (only-if-cached)",
                 headers = ResponseHeaders(),
                 body = ByteArray(0)
             )
+            withCacheHeader(missingResponse, "MISS")
         }
     }
 

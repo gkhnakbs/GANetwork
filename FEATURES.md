@@ -164,6 +164,7 @@ Dual-engine caching adhering to RFC HTTP caching specifications (`ETag`, `Cache-
   - `CachePolicy.DEFAULT`: Returns fresh cached response; sends conditional headers (`If-None-Match`, `If-Modified-Since`) if stale; merges headers on 304.
   - `CachePolicy.FORCE_NETWORK`: Bypasses cache, forces network fetch, updates cache if cacheable (ideal for pull-to-refresh).
   - `CachePolicy.FORCE_CACHE`: Strictly serves from local cache; returns 504 Gateway Timeout if missing or stale (ideal for offline mode).
+  - `RFC 7234 Section 4.4 Invalidation`: Automatically invalidates the cached URL when state-modifying requests (`POST`, `PUT`, `DELETE`) succeed (2xx), preventing stale data desynchronization.
   - Diagnostic Header: Tags responses with `X-GANetwork-Cache: HIT`, `MISS`, or `CONDITIONAL_HIT`.
 
 ### Storage Options
@@ -193,17 +194,21 @@ httpClient { diskCache(File(context.cacheDir, "http_cache"), maxSizeBytes = 50 *
 Comprehensive support for transferring JSON, URL-encoded forms, raw binary data, and standard multipart file uploads.
 
 * **Data Types Supported:**
-  - Structured JSON objects / arrays via DSL.
-  - Form URL-encoded key-value pairs (`application/x-www-form-urlencoded`).
-  - Raw binary byte arrays (`ByteArray`) with direct streaming to socket.
+  - Structured JSON objects / arrays via DSL (`jsonBody`).
+  - Form URL-encoded key-value pairs (`formBody`).
+  - Plain text strings (`textBody`).
+  - Raw binary byte arrays (`binaryBody(ByteArray)`).
+  - Single-file binary uploads with auto-MIME detection (`fileBody(File)`).
 * **Multipart/Form-Data (RFC 7578 / RFC 2046):**
   - Text form fields: `part(name, value)`.
   - Files (`java.io.File`): Automatic MIME detection by extension (`.pdf` -> `application/pdf`, `.jpg` -> `image/jpeg`).
   - Raw binary parts: `part(name, filename, bytes, contentType)`.
   - Automatic boundary generation avoiding boundary collisions.
+  - Quote sanitization (`%22`) in part headers preventing header injection.
   - Preserves binary integrity by avoiding UTF-8 string encoding mutations on binary parts.
 
 ```kotlin
+// 1. Multipart multi-part upload:
 val response = client.post<UploadResponse>("api/v1/documents") {
     multipartBody {
         part("userId", "10045")
@@ -211,6 +216,11 @@ val response = client.post<UploadResponse>("api/v1/documents") {
         part("certificate", File(context.cacheDir, "doc.pdf"))
         part("signature", "sign.png", signatureBytes, ContentType.IMAGE_PNG)
     }
+}
+
+// 2. Direct single file upload (e.g. to AWS S3 / Cloud Storage):
+client.put<Unit>("storage/uploads/avatar.png") {
+    fileBody(File(context.cacheDir, "avatar.png"))
 }
 ```
 
@@ -226,20 +236,21 @@ Real-time streaming observation for both outgoing payloads and incoming response
   - `totalBytes: Long`: Expected byte length (or -1 if `Content-Length` is missing / chunked transfer).
   - `percentage: Int`: Computed integer percentage (0..100) or -1.
   - `fraction: Float`: Normalized float (0.0f..1.0f) tailored directly for Jetpack Compose `LinearProgressIndicator`.
-  - `isCompleted: Boolean`: Indicates if transfer reached completion.
+  - `isCompleted: Boolean`: Guaranteed completion flag (`true` when complete, including chunked streams).
+  - `formattedTransferred`: Human-readable transferred size (e.g. `1.2 MB`, `450 KB`).
+  - `formattedTotal`: Human-readable total size (e.g. `10.5 MB` or `Unknown`).
+* **Chunked Stream Completion Guarantee:** When downloading streams with unknown `Content-Length`, an automatic completion event is fired upon EOF so UI bars gracefully dismiss.
 * **Zero Overhead:** When listeners are not registered, standard single-pass reads/writes are utilized.
 
 ```kotlin
-client.post<UploadResponse>("upload") {
-    multipartBody { part("file", largeFile) }
-    onUploadProgress { progress ->
-        progressBar.progress = progress.percentage
-    }
-}
-
-client.get<String>("download/package.zip") {
+// Compose integration example:
+client.get<ByteArray>("download/package.zip") {
     onDownloadProgress { progress ->
-        println("Downloaded: %${progress.percentage} (${progress.bytesTransferred} / ${progress.totalBytes} bytes)")
+        progressState.value = progress.fraction
+        statusText.value = "${progress.formattedTransferred} / ${progress.formattedTotal}"
+        if (progress.isCompleted) {
+            println("Download finished!")
+        }
     }
 }
 ```
