@@ -157,7 +157,7 @@ addInterceptor(AuthInterceptor(headerName = "Authorization") { tokenProvider() }
 ```
 
 ### Token Authenticator (401 Otomatik Yenileme)
-Sunucudan 401 Unauthorized yanıtı geldiğinde, token'ı arka planda otomatik yenileyip isteği yineler. Mutex tabanlı eşzamanlılık koruması sayesinde aynı anda birden fazla istek 401 alsa bile yenileme fonksiyonu yalnızca **1 kez** çalıştırılır:
+Sunucudan 401 Unauthorized yanıtı geldiğinde, token'ı arka planda otomatik yenileyip isteği yineler. Mutex tabanlı eşzamanlılık koruması sayesinde aynı anda birden fazla istek 401 alsa bile yenileme fonksiyonu yalnızca **1 kez** çalıştırılır. Yenileme başarısız olduğunda ise `onAuthFailed` callback'i üzerinden kullanıcı oturumu güvenle sonlandırılabilir:
 ```kotlin
 val client = httpClient {
     baseUrl = "https://api.example.com/"
@@ -168,25 +168,31 @@ val client = httpClient {
             val newSession = authApi.refreshToken(expiredToken)
             userPreferences.saveAccessToken(newSession.accessToken)
             newSession.accessToken // Başarılıysa yeni token döner, başarısızsa null döner
+        },
+        onAuthFailed = {
+            // Refresh token geçersizse oturumu kapatıp Login ekranına yönlendir
+            userPreferences.clear()
+            navigator.navigateToLogin()
         }
     )
 }
 ```
 
 ### Retry Yapılandırması (Yeniden Deneme)
-Ağ kopmaları (-1), 5xx sunucu hataları veya 429 Too Many Requests durumlarında **exponential backoff** ve **random jitter** ile otomatik yeniden deneme yapar.
+Ağ kopmaları (-1), 5xx sunucu hataları veya 429 Too Many Requests durumlarında **exponential backoff** ve **random jitter** ile otomatik yeniden deneme yapar. Sunucudan `Retry-After` başlığı geldiğinde sunucunun talep ettiği bekleme süresine (RFC 6585 & 7231) tam uyum sağlar.
 > **Not:** Varsayılan olarak hem istemci hem de metot seviyesinde retry kapalıdır (`noRetry`). İstediğiniz yerde opt-in olarak açabilirsiniz.
 
-#### 1. İstemci Düzeyinde Varsayılan Retry:
+#### 1. İstemci Düzeyinde Varsayılan Retry (Milisaniye veya Kotlin `Duration`):
 ```kotlin
 val client = httpClient {
     baseUrl = "https://api.example.com/"
 
     retryConfig {
         maxRetries = 3
-        initialDelayMs = 1000L
+        initialDelay(500.milliseconds)
+        maxDelay(5.seconds)
         backoffMultiplier = 2.0
-        jitter = true
+        useJitter = true
     }
 }
 ```
@@ -205,8 +211,8 @@ client.post<PaymentResponse>("checkout") {
 ```
 
 ### HTTP Önbellekleme (Cache & ETag)
-Standart HTTP `Cache-Control` (`max-age`, `no-store`) ve `ETag` (`If-None-Match`, `304 Not Modified`) kurallarına göre çalışan bellek içi (In-Memory LRU) önbellekleme desteği sunar.
-> **Not:** Varsayılan olarak önbellekleme tamamen kapalıdır (`null`). İhtiyaç duyulan istemcilerde `memoryCache(...)` ile kolayca açılabilir.
+Standart HTTP `Cache-Control` (`max-age`, `no-store`) ve `ETag` (`If-None-Match`, `304 Not Modified`) kurallarına göre çalışan bellek içi (In-Memory LRU) ve kalıcı disk (DiskLruCache) önbellekleme desteği sunar. RFC 7234 Section 4.4 uyarınca `POST`, `PUT`, `DELETE` gibi mutasyon istekleri başarılı olduğunda ilgili URL'nin önbelleği otomatik olarak temizlenir.
+> **Not:** Varsayılan olarak önbellekleme tamamen kapalıdır (`null`). İhtiyaç duyulan istemcilerde `memoryCache(...)` veya `diskCache(...)` ile kolayca açılabilir.
 
 #### 1. İstemci Düzeyinde Önbellek Tanımlama:
 ```kotlin
@@ -234,51 +240,46 @@ client.get<WeatherResponse>("weather") {
 }
 ```
 
-### Multipart / Form-Data (Dosya ve Görsel Yükleme)
-Dosya (`java.io.File`), görsel bayt dizileri (`ByteArray`) ve metin form alanlarını tek bir istekte sunucuya yükleme desteği sunar. Dosya uzantısına göre MIME tipleri otomatik tespit edilir (istenirse elle de belirtilebilir).
+### Payloads & Multipart / Form-Data (Dosya ve Görsel Yükleme)
+Dosya (`java.io.File`), görsel bayt dizileri (`ByteArray`), metin form alanları ve JSON nesnelerini gönderme desteği sunar. Dosya uzantısına göre MIME tipleri otomatik tespit edilir:
 
 ```kotlin
+// 1. Çok Parçalı (Multipart) Form Yüklemesi:
 val pdfFile = File(context.cacheDir, "ogrenci_belgesi.pdf")
 
 val response = client.post<UploadResponse>("api/v1/student/upload") {
     multipartBody {
-        // 1. Metin Form Alanları:
         part("studentId", "2024105012")
         part("documentType", "STUDENT_CERTIFICATE")
-
-        // 2. Dosya (MIME tipi .pdf uzantısından 'application/pdf' olarak otomatik algılanır):
         part("documentFile", pdfFile)
-
-        // 3. Doğrudan ByteArray (ör. kameradan alınan JPEG görseli):
-        // part(name = "avatar", filename = "selfie.jpg", bytes = imageBytes)
+        part("avatar", "selfie.jpg", imageBytes, ContentType.IMAGE_JPEG)
     }
+}
+
+// 2. Doğrudan Tekil Dosya Yükleme (ör. AWS S3 veya Cloud Storage):
+client.put<Unit>("storage/uploads/avatar.png") {
+    fileBody(File(context.cacheDir, "avatar.png"))
 }
 ```
 
 ### Progress Tracking (İlerleme Dinleyicisi)
-Büyük dosya yüklemeleri (upload) veya yanıt indirmeleri (download) sırasında kullanıcı arayüzünü (ProgressBar / yüzde) anlık olarak güncellemek için kullanılır. `Progress` nesnesi üzerinden aktarılan bayt, toplam bayt ve yüzde bilgisine erişebilirsiniz.
+Büyük dosya yüklemeleri (upload) veya yanıt indirmeleri (download) sırasında kullanıcı arayüzünü (Jetpack Compose `LinearProgressIndicator` / ProgressBar) anlık olarak güncellemek için kullanılır. `Progress` nesnesi üzerinden aktarılan bayt, toplam bayt, yüzde, hazır biçimlendirilmiş metinler (`formattedTransferred`, `formattedTotal`) ve tamamlama bilgisine erişebilirsiniz:
 
 ```kotlin
-// 1. Yükleme (Upload) İlerleme Takibi:
-client.post<UploadResponse>("api/v1/student/upload") {
-    multipartBody {
-        part("documentFile", pdfFile)
-    }
-    onUploadProgress { progress ->
-        Log.d("Upload", "Yükleniyor: %${progress.percentage} (${progress.bytesTransferred}/${progress.totalBytes})")
-    }
-}
-
-// 2. İndirme (Download) İlerleme Takibi:
-client.get<String>("api/v1/reports/annual.pdf") {
+// Compose / UI Entegrasyonu:
+client.get<ByteArray>("download/package.zip") {
     onDownloadProgress { progress ->
-        Log.d("Download", "İndiriliyor: %${progress.percentage}")
+        progressFraction.value = progress.fraction // Compose LinearProgressIndicator için 0.0f..1.0f
+        statusText.value = "${progress.formattedTransferred} / ${progress.formattedTotal}" // ör. "1.2 MB / 10.5 MB"
+        if (progress.isCompleted) {
+            Log.d("Download", "İndirme tamamlandı!")
+        }
     }
 }
 ```
 
 ### Zaman Aşımı Yönetimi (Timeouts & Call Timeout)
-Bağlantı (`connectTimeout`), okuma (`readTimeout`) ve tüm çağrıyı kapsayan tavan süreyi (`callTimeout`) hem istemci düzeyinde varsayılan olarak hem de istek bazında belirleyebilirsiniz. Sayısal milisaniye veya Kotlin `Duration` desteği mevcuttur.
+Bağlantı (`connectTimeout`), okuma (`readTimeout`) ve tüm çağrıyı kapsayan tavan süreyi (`callTimeout`) hem istemci düzeyinde varsayılan olarak hem de istek bazında belirleyebilirsiniz. Sayısal milisaniye veya Kotlin `Duration` desteği mevcuttur. Girişler otomatik olarak `.coerceAtLeast(0)` ile negatif değerlere karşı korunur.
 
 ```kotlin
 // 1. İstemci Düzeyinde Varsayılan Timeout'lar:
@@ -286,7 +287,7 @@ val client = httpClient {
     baseUrl = "https://api.example.com/"
     connectTimeout(10.seconds)
     readTimeout(20.seconds)
-    callTimeout(30.seconds) // Toplam tavan süre (DNS + TLS + Retry + Body)
+    callTimeout(30.seconds) // Toplam tavan süre (DNS + TLS + Retry + Body); aşılırsa soket anında kapatılır
 }
 
 // 2. İstek Düzeyinde Özelleştirme (Override):
@@ -300,7 +301,7 @@ client.post<UploadResponse>("api/v1/heavy-upload") {
 ```
 
 ### Performans ve Ağ Metrikleri (Metrics & Diagnostics)
-Ağ çağrılarının toplam süresini (`durationMs`), giden ve gelen bayt boyutlarını (`sentBytes`, `receivedBytes`), durum kodunu ve yanıtın önbellekten gelip gelmediğini (`isFromCache`) ölçümleyen `MetricsInterceptor` sunar. İster kendi analitik servisinize bağlayabilir, isterseniz hazır formatlı loglayıcıyı kullanabilirsiniz.
+Ağ çağrılarının toplam süresini nanosaniye hassasiyetinde (`System.nanoTime()` ile saat kaymalarından etkilenmeden), giden ve gelen bayt boyutlarını (`formattedSent`, `formattedReceived`), durum kodunu ve yanıtın önbellekten gelip gelmediğini (`isFromCache`) ölçümleyen `MetricsInterceptor` sunar. Üçüncü taraf APM hataları ağ isteklerini asla aksatmayacak şekilde izole edilmiştir (`runCatching`).
 
 ```kotlin
 val client = httpClient {
@@ -314,7 +315,7 @@ val client = httpClient {
         Log.d(
             "Metrics",
             "${metrics.method} ${metrics.url} -> ${metrics.statusCode} " +
-            "(${metrics.durationMs}ms, Önbellek: ${metrics.isFromCache}, Giden: ${metrics.sentBytes} B, Gelen: ${metrics.receivedBytes} B)"
+            "(${metrics.durationMs}ms, Önbellek: ${metrics.isFromCache}, Giden: ${metrics.formattedSent}, Gelen: ${metrics.formattedReceived})"
         )
     })
 }
@@ -325,20 +326,17 @@ val client = httpClient {
 ## SSL/TLS Yapılandırması
 - Özel `SSLSocketFactory` ve `X509TrustManager` ile kurumsal CA/self-signed sertifikalar
 - `HostnameVerifier` özelleştirme (gerekirse)
-- Certificate Pinning (public key SHA-256)
+- Certificate Pinning: SHA-256 public key hash sabitleme, hiyerarşik wildcard alan adı (`*.example.com`) eşleştirme ve katı pin doğrulama
 
-Örnek: Certificate Pinning
+Örnek: Akıcı DSL ile Certificate Pinning
 ```kotlin
-sslConfig {
-    certificatePinner(
-        CertificatePinner.builder()
-            .add(
-                "api.example.com",
-                "sha256/PRIMARY_PIN_BASE64=",
-                "sha256/BACKUP_PIN_BASE64="
-            )
-            .build()
-    )
+val client = httpClient {
+    sslConfig {
+        certificatePinner {
+            add("api.example.com", "sha256/PRIMARY_PIN_BASE64=", "sha256/BACKUP_PIN_BASE64=")
+            add("*.backend.org", "sha256/WILDCARD_PIN_BASE64=")
+        }
+    }
 }
 ```
 

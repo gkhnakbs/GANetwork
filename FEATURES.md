@@ -330,19 +330,19 @@ Enterprise-grade cryptographic protections and pinning support for secure commun
 
 * **Custom Trust Management:** Easily plug custom `SSLSocketFactory`, `X509TrustManager`, and `HostnameVerifier` for corporate CAs or internal gateways.
 * **Certificate Pinning (`CertificatePinner`):**
-  - SHA-256 public key hash pinning against hostnames.
-  - Wildcard domain support (e.g. `*.example.com`).
-  - Supports multiple pin entries per domain for zero-downtime key rotations.
-  - Throws `SSLPeerUnverifiedException` immediately upon pin mismatch.
+  - SHA-256 public key hash pinning against hostnames (`sha256/<base64>`).
+  - Hierarchical wildcard domain support (e.g. `*.example.com` correctly matches `api.example.com` and nested subdomains).
+  - Multiple pin entries per domain for seamless zero-downtime key rotations.
+  - Fail-secure validation: Throws `IllegalArgumentException` on malformed pin definitions to prevent accidental security bypass, and throws `SSLPeerUnverifiedException` with socket abort upon pin mismatch.
+  - Fluent DSL configuration directly within `sslConfig`.
 
 ```kotlin
 val client = httpClient {
     sslConfig {
-        certificatePinner(
-            CertificatePinner.builder()
-                .add("api.example.com", "sha256/PRIMARY_PIN_BASE64=", "sha256/BACKUP_PIN_BASE64=")
-                .build()
-        )
+        certificatePinner {
+            add("api.example.com", "sha256/PRIMARY_PIN_BASE64=", "sha256/BACKUP_PIN_BASE64=")
+            add("*.backend.org", "sha256/WILDCARD_PIN_BASE64=")
+        }
     }
 }
 ```

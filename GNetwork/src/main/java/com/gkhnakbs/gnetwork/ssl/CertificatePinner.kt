@@ -22,9 +22,7 @@ class CertificatePinner private constructor(
      * @throws SSLPeerUnverifiedException If no certificate matches any pinned public key hash.
      */
     fun check(hostname: String, certificates: List<Certificate>) {
-        val cleanHostname = hostname.lowercase().trim()
-        val hostPins = pins[cleanHostname] ?: pins["*.$cleanHostname"] ?: return
-
+        val hostPins = findPinsForHost(hostname)
         if (hostPins.isEmpty()) return
 
         for (certificate in certificates) {
@@ -46,6 +44,27 @@ class CertificatePinner private constructor(
             "  Pinned: ${hostPins.joinToString { it.toString() }}\n" +
             "  Found: ${certificates.joinToString { sha256Hash(it) }}"
         )
+    }
+
+    /**
+     * Resolves all matching pins for a given host, evaluating exact match and hierarchical wildcard patterns (e.g. *.example.com).
+     */
+    internal fun findPinsForHost(hostname: String): List<Pin> {
+        val cleanHostname = hostname.lowercase().trim()
+        val matchingPins = mutableListOf<Pin>()
+
+        // 1. Exact hostname match
+        pins[cleanHostname]?.let { matchingPins.addAll(it) }
+
+        // 2. Wildcard pattern matching across parent domains (e.g. api.example.com -> *.example.com)
+        var dotIndex = cleanHostname.indexOf('.')
+        while (dotIndex != -1 && dotIndex < cleanHostname.length - 1) {
+            val wildcardPattern = "*." + cleanHostname.substring(dotIndex + 1)
+            pins[wildcardPattern]?.let { matchingPins.addAll(it) }
+            dotIndex = cleanHostname.indexOf('.', dotIndex + 1)
+        }
+
+        return matchingPins
     }
 
     private fun sha256(data: ByteArray): ByteArray {
@@ -105,10 +124,10 @@ class CertificatePinner private constructor(
             val hostPins = pins.getOrPut(cleanHostname) { mutableListOf() }
 
             for (pinHash in pinHashes) {
-                val pin = parsePin(pinHash)
-                if (pin != null) {
-                    hostPins.add(pin)
+                val pin = requireNotNull(parsePin(pinHash)) {
+                    "Invalid pin format: '$pinHash'. Expected format: 'sha256/<base64-encoded-hash>'"
                 }
+                hostPins.add(pin)
             }
         }
 

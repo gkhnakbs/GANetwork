@@ -96,6 +96,13 @@ class SSLConfigBuilder {
     }
 
     /**
+     * Configures a [CertificatePinner] using a DSL builder.
+     */
+    fun certificatePinner(block: CertificatePinner.Builder.() -> Unit) = apply {
+        this.certificatePinner = CertificatePinner.builder().apply(block).build()
+    }
+
+    /**
      * ⚠️ DEBUG ONLY: Disables all certificate and hostname validation.
      */
     fun trustAllCertificates() = apply {
