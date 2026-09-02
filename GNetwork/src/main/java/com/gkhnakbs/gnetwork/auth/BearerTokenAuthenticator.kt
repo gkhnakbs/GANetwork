@@ -16,6 +16,7 @@ import kotlinx.coroutines.sync.withLock
  * @property headerName The name of the authorization header (defaults to "Authorization").
  * @property tokenPrefix The prefix prepended to the token (defaults to "Bearer ").
  * @property currentToken Optional supplier for the current cached token to enable double-checked locking.
+ * @property onAuthFailed Optional suspend callback triggered when token refresh permanently fails or returns null.
  * @property onRefreshToken Suspend callback invoked to obtain a new token given the expired token string.
  *
  * Created by Gökhan Akbaş.
@@ -24,6 +25,7 @@ class BearerTokenAuthenticator(
     private val headerName: String = "Authorization",
     private val tokenPrefix: String = "Bearer ",
     private val currentToken: (suspend () -> String?)? = null,
+    private val onAuthFailed: (suspend () -> Unit)? = null,
     private val onRefreshToken: suspend (expiredToken: String?) -> String?,
 ) : Authenticator {
 
@@ -33,21 +35,21 @@ class BearerTokenAuthenticator(
      * Authenticates the 401 response by refreshing the token and updating request headers.
      */
     override suspend fun authenticate(request: HttpRequest, response: RawResponse): HttpRequest? {
-        val requestAuthHeader = request.headers[headerName]
+        val requestAuthHeader = request.headers.entries
+            .firstOrNull { it.key.equals(headerName, ignoreCase = true) }
+            ?.value
 
         return mutex.withLock {
-            // Check-then-act: Eğer biz kilidi beklerken başka bir coroutine token'ı zaten yenilediyse,
-            // tekrar refresh servisine gitmeden hemen yeni token ile isteği güncelle.
+            // Check-then-act: If another coroutine already refreshed the token while we waited for the lock,
+            // immediately retry with the refreshed token without hitting the auth service again.
             val latestToken = currentToken?.invoke()
             val formattedLatestHeader = latestToken?.let { formatHeader(it) }
 
             if (!formattedLatestHeader.isNullOrBlank() && formattedLatestHeader != requestAuthHeader) {
-                return@withLock request.copy(
-                    headers = request.headers + (headerName to formattedLatestHeader)
-                )
+                return@withLock withUpdatedAuthHeader(request, formattedLatestHeader)
             }
 
-            // Token henüz yenilenmemiş, sadece ilk gelen coroutine yenileme fonksiyonunu çalıştırır:
+            // Token is still stale: the first coroutine to enter executes the refresh routine:
             val expiredToken = requestAuthHeader?.let {
                 if (tokenPrefix.isNotEmpty() && it.startsWith(tokenPrefix, ignoreCase = true)) {
                     it.substring(tokenPrefix.length).trim()
@@ -56,13 +58,20 @@ class BearerTokenAuthenticator(
                 }
             }
 
-            val newToken = onRefreshToken(expiredToken) ?: return@withLock null
-            val newHeaderValue = formatHeader(newToken)
+            val newToken = onRefreshToken(expiredToken)
+            if (newToken == null) {
+                onAuthFailed?.invoke()
+                return@withLock null
+            }
 
-            request.copy(
-                headers = request.headers + (headerName to newHeaderValue)
-            )
+            val newHeaderValue = formatHeader(newToken)
+            withUpdatedAuthHeader(request, newHeaderValue)
         }
+    }
+
+    private fun withUpdatedAuthHeader(request: HttpRequest, newHeaderValue: String): HttpRequest {
+        val filtered = request.headers.filterKeys { !it.equals(headerName, ignoreCase = true) }
+        return request.copy(headers = filtered + (headerName to newHeaderValue))
     }
 
     private fun formatHeader(token: String): String {

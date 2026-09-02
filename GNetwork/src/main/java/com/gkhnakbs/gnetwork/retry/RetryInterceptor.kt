@@ -29,7 +29,7 @@ class RetryInterceptor(
 
         while (attempt < config.maxRetries && config.retryOn(chain.request, response)) {
             attempt++
-            val delayMs = calculateDelay(attempt, config)
+            val delayMs = calculateDelay(attempt, config, response)
             if (delayMs > 0) {
                 delay(delayMs)
             }
@@ -39,7 +39,13 @@ class RetryInterceptor(
         return response
     }
 
-    private fun calculateDelay(attempt: Int, config: RetryConfig): Long {
+    private fun calculateDelay(attempt: Int, config: RetryConfig, response: RawResponse): Long {
+        // Respect RFC 6585/7231 Retry-After header if present (e.g. on 429 Too Many Requests or 503)
+        val retryAfterSeconds = response.headers.firstIgnoreCase("Retry-After")?.trim()?.toLongOrNull()
+        if (retryAfterSeconds != null && retryAfterSeconds > 0) {
+            return min(retryAfterSeconds * 1000L, config.maxDelayMs)
+        }
+
         val exponential = config.initialDelayMs * config.backoffMultiplier.pow((attempt - 1).toDouble())
         val capped = min(exponential.toLong(), config.maxDelayMs)
 

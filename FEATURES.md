@@ -100,15 +100,21 @@ class LatencyObserver : Interceptor {
 Solves 401 Unauthorized handling cleanly with thread-safe, mutex-protected token refresh.
 
 * **Mutex Synchronization:** When multiple concurrent requests fail with 401, a shared `Mutex` ensures **only one** refresh request hits the authentication server. Subsequent requests wait for the mutex and reuse the newly acquired token.
+* **Case-Insensitive Header Sanitization:** Safely matches authorization headers regardless of casing (`Authorization`, `authorization`) and strips existing headers before attaching refreshed tokens, eliminating duplicate header corruption.
+* **Session Expiry Hook (`onAuthFailed`):** Triggers a callback when refresh tokens expire or are rejected (`null`), allowing apps to clear credentials and navigate to login.
 * **Infinite Loop Protection:** Automatic single-retry limit prevents endless 401 retry cycles when credentials are permanently revoked.
 * **Implementations:**
   - `Authenticator.NONE`: Default no-op behavior.
-  - `BearerTokenAuthenticator`: Built-in provider supporting custom auth headers, token prefixes, token cache checking, and suspend refresh blocks.
+  - `BearerTokenAuthenticator`: Built-in provider supporting custom auth headers, token prefixes, double-checked locking token supplier, `onAuthFailed` session expiry, and suspend refresh blocks.
 
 ```kotlin
 val client = httpClient {
     tokenAuthenticator(
         currentToken = { tokenStorage.getAccessToken() },
+        onAuthFailed = {
+            sessionManager.clearSession()
+            navigator.navigateToLogin()
+        },
         onRefreshToken = { expiredToken ->
             authService.refreshToken(expiredToken)
         }
@@ -123,18 +129,20 @@ val client = httpClient {
 Guards against transient network drops and temporary server hiccups using exponential backoff with full randomized jitter.
 
 * **Strict Opt-in by Default:** By default, retries are disabled (`maxRetries = 0`). Safe by design for non-idempotent operations.
+* **Server-Driven Rate Limit Respect (`Retry-After`):** When encountering `429 Too Many Requests` or `503 Service Unavailable`, respects the server's `Retry-After` header delay instead of retrying prematurely, adhering to RFC 6585 and RFC 7231.
+* **Exponential Backoff & Full Jitter:** Automatically spaces out subsequent attempts with randomized jitter to prevent thundering herd spikes.
 * **Retry Criteria:**
   - Transient HTTP Statuses: 408 (Request Timeout), 429 (Too Many Requests), 500, 502, 503, 504.
   - Transient IO Exceptions: `SocketTimeoutException`, `ConnectException`, `UnknownHostException`.
-* **Configurable Scope:** Set client-wide defaults or override per-request.
+* **Configurable Scope & Kotlin Duration:** Configure client-wide defaults using numeric milliseconds or Kotlin `Duration` (`1.seconds`, `10.seconds`), and override per-request.
 
 ```kotlin
-// Client level:
+// Client level with Kotlin Duration:
 val client = httpClient {
     retryConfig {
         maxRetries = 3
-        initialDelayMs = 500L
-        maxDelayMs = 5000L
+        initialDelay(500.milliseconds)
+        maxDelay(5.seconds)
         backoffMultiplier = 2.0
         useJitter = true
     }

@@ -2,6 +2,7 @@ package com.gkhnakbs.gnetwork.retry
 
 import com.gkhnakbs.gnetwork.interceptor.RawResponse
 import com.gkhnakbs.gnetwork.request.HttpRequest
+import kotlin.time.Duration
 
 /**
  * Configuration options for retrying failed HTTP requests.
@@ -49,6 +50,20 @@ class RetryConfigBuilder {
     var backoffMultiplier: Double = 2.0
     var jitter: Boolean = true
     private var retryOnPredicate: ((HttpRequest, RawResponse) -> Boolean)? = null
+
+    /**
+     * Sets the initial delay before the first retry using Kotlin [Duration].
+     */
+    fun initialDelay(duration: Duration) = apply {
+        this.initialDelayMs = duration.inWholeMilliseconds
+    }
+
+    /**
+     * Sets the maximum delay ceiling between retries using Kotlin [Duration].
+     */
+    fun maxDelay(duration: Duration) = apply {
+        this.maxDelayMs = duration.inWholeMilliseconds
+    }
 
     /**
      * Sets a custom condition predicate for triggering a retry.

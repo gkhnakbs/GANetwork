@@ -66,19 +66,22 @@ class HttpClientBuilder {
      * @param headerName Name of the auth header (defaults to "Authorization").
      * @param tokenPrefix Token scheme prefix (defaults to "Bearer ").
      * @param currentToken Optional supplier for the current cached token to avoid duplicate refresh calls.
+     * @param onAuthFailed Optional suspend callback triggered when token refresh permanently fails or returns null.
      * @param onRefreshToken Suspend callback to fetch a new token given the expired token.
      */
     fun tokenAuthenticator(
         headerName: String = "Authorization",
         tokenPrefix: String = "Bearer ",
         currentToken: (suspend () -> String?)? = null,
+        onAuthFailed: (suspend () -> Unit)? = null,
         onRefreshToken: suspend (expiredToken: String?) -> String?,
     ) = apply {
         this.authenticator = BearerTokenAuthenticator(
             headerName = headerName,
             tokenPrefix = tokenPrefix,
             currentToken = currentToken,
-            onRefreshToken = onRefreshToken
+            onAuthFailed = onAuthFailed,
+            onRefreshToken = onRefreshToken,
         )
     }
 
@@ -87,7 +90,7 @@ class HttpClientBuilder {
      */
     fun tokenAuthenticator(
         onRefreshToken: suspend (expiredToken: String?) -> String?,
-    ) = tokenAuthenticator(currentToken = null, onRefreshToken = onRefreshToken)
+    ) = tokenAuthenticator(currentToken = null, onAuthFailed = null, onRefreshToken = onRefreshToken)
 
     /**
      * Sets the default [RetryConfig] applied to requests that do not specify their own retry policy.
