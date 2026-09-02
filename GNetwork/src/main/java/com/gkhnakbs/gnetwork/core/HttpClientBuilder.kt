@@ -4,12 +4,14 @@ import com.gkhnakbs.gnetwork.auth.Authenticator
 import com.gkhnakbs.gnetwork.auth.BearerTokenAuthenticator
 import com.gkhnakbs.gnetwork.cache.Cache
 import com.gkhnakbs.gnetwork.cache.CacheInterceptor
+import com.gkhnakbs.gnetwork.cache.DiskLruCache
 import com.gkhnakbs.gnetwork.cache.MemoryLruCache
 import com.gkhnakbs.gnetwork.retry.RetryConfig
 import com.gkhnakbs.gnetwork.retry.RetryConfigBuilder
 import com.gkhnakbs.gnetwork.retry.RetryInterceptor
 import com.gkhnakbs.gnetwork.ssl.SSLConfig
 import com.gkhnakbs.gnetwork.ssl.SSLConfigBuilder
+import java.io.File
 import kotlin.time.Duration
 
 /**
@@ -115,6 +117,21 @@ class HttpClientBuilder {
      */
     fun memoryCache(maxSizeBytes: Long = 10 * 1024 * 1024L) = apply {
         this.cache = MemoryLruCache(maxSizeBytes)
+    }
+
+    /**
+     * Enables a persistent disk-based LRU cache stored in [directory].
+     *
+     * Cached responses survive application restarts and device reboots.
+     *
+     * @param directory File directory where cache files are stored (e.g. `File(context.cacheDir, "http_cache")`).
+     * @param maxSizeBytes Maximum cache storage capacity in bytes (defaults to 50 MB).
+     */
+    fun diskCache(
+        directory: File,
+        maxSizeBytes: Long = 50 * 1024 * 1024L,
+    ) = apply {
+        this.cache = DiskLruCache(directory, maxSizeBytes)
     }
 
     /**

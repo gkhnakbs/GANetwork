@@ -7,6 +7,7 @@ Modern Kotlin/Android için basit, esnek ve genişletilebilir bir network kütü
 - SSL/TLS: Özel TrustManager, HostnameVerifier ve Certificate Pinning
 - GZip ve charset desteği; doğru gövde okuma
 - Net sonuç modeli: `HttpResponse.Success/Failure/Error`
+- 📖 Detaylı İngilizce mimari ve özellik rehberi için: [FEATURES.md](./FEATURES.md)
 
 ---
 
@@ -207,13 +208,16 @@ client.post<PaymentResponse>("checkout") {
 Standart HTTP `Cache-Control` (`max-age`, `no-store`) ve `ETag` (`If-None-Match`, `304 Not Modified`) kurallarına göre çalışan bellek içi (In-Memory LRU) önbellekleme desteği sunar.
 > **Not:** Varsayılan olarak önbellekleme tamamen kapalıdır (`null`). İhtiyaç duyulan istemcilerde `memoryCache(...)` ile kolayca açılabilir.
 
-#### 1. İstemci Düzeyinde Önbellek Tanımlama (10 MB LRU):
+#### 1. İstemci Düzeyinde Önbellek Tanımlama:
 ```kotlin
 val client = httpClient {
     baseUrl = "https://api.example.com/"
 
-    // 10 MB bellek içi LRU önbelleği aktif eder
+    // Seçenek A: Bellek içi (In-Memory) 10 MB LRU önbellek (RAM):
     memoryCache(maxSizeBytes = 10 * 1024 * 1024L)
+
+    // Seçenek B: Kalıcı Disk (DiskLruCache) 50 MB önbellek (Uygulama kapansa da saklanır):
+    // diskCache(File(context.cacheDir, "http_cache"), maxSizeBytes = 50 * 1024 * 1024L)
 }
 ```
 
@@ -295,6 +299,27 @@ client.post<UploadResponse>("api/v1/heavy-upload") {
 }
 ```
 
+### Performans ve Ağ Metrikleri (Metrics & Diagnostics)
+Ağ çağrılarının toplam süresini (`durationMs`), giden ve gelen bayt boyutlarını (`sentBytes`, `receivedBytes`), durum kodunu ve yanıtın önbellekten gelip gelmediğini (`isFromCache`) ölçümleyen `MetricsInterceptor` sunar. İster kendi analitik servisinize bağlayabilir, isterseniz hazır formatlı loglayıcıyı kullanabilirsiniz.
+
+```kotlin
+val client = httpClient {
+    baseUrl = "https://api.example.com/"
+
+    // 1. Konsol veya Logcat için Hazır Formatlı Loglayıcı:
+    addInterceptor(MetricsInterceptor.logging { Log.d("NetworkMetrics", it) })
+
+    // 2. Özel Analitik / APM Entegrasyonu (Firebase Performance, Datadog vb.):
+    addInterceptor(MetricsInterceptor { metrics ->
+        Log.d(
+            "Metrics",
+            "${metrics.method} ${metrics.url} -> ${metrics.statusCode} " +
+            "(${metrics.durationMs}ms, Önbellek: ${metrics.isFromCache}, Giden: ${metrics.sentBytes} B, Gelen: ${metrics.receivedBytes} B)"
+        )
+    })
+}
+```
+
 ---
 
 ## SSL/TLS Yapılandırması
@@ -344,11 +369,11 @@ Ergonomi yardımcıları:
 - [x] TokenAuthenticator (Authenticator arayüzü, BearerTokenAuthenticator ve 401 Mutex retry)
 - [x] RetryInterceptor (Exponential backoff, jitter, client ve istek bazlı özelleştirilebilir retry)
 - [x] CacheInterceptor (ETag, Cache-Control, In-Memory LRU Cache, 304 Not Modified, CachePolicy)
+- [x] DiskLruCache (Kalıcı dosya tabanlı, uygulama yeniden başlatılsa bile saklanan çift dosyalı LRU önbellek)
 - [x] Multipart/Form-Data (Dosya, görsel, binary ve form alanları yükleme desteği)
 - [x] Progress takibi (Upload ve download anlık ilerleme dinleyicisi: yüzde, bayt, tamamlama)
 - [x] Timeout Yönetimi (Client ve request düzeyinde connect, read ve callTimeout; Kotlin Duration desteği)
-- [ ] DiskLruCache (Kalıcı dosya tabanlı LRU önbellek)
-- [ ] Metrics/AnalyticsInterceptor
+- [x] Metrics/AnalyticsInterceptor (İstek süreleri, giden/gelen bayt boyutları, cache teşhisi ve loglama interceptor'ı)
 - [ ] Redirect yönetimi (307/308 method/body preservation)
 
 ---

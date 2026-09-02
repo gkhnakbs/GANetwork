@@ -45,7 +45,7 @@ class CacheInterceptor(
     private fun handleForceCache(cacheKey: String): RawResponse {
         val cached = cache.get(cacheKey)
         return if (cached != null) {
-            cached.toRawResponse()
+            withCacheHeader(cached.toRawResponse(), "HIT")
         } else {
             RawResponse(
                 statusCode = 504,
@@ -63,7 +63,7 @@ class CacheInterceptor(
     ): RawResponse {
         val networkResponse = chain.proceed(request)
         updateCacheIfCacheable(cacheKey, networkResponse)
-        return networkResponse
+        return withCacheHeader(networkResponse, "MISS")
     }
 
     private suspend fun handleDefault(
@@ -75,7 +75,7 @@ class CacheInterceptor(
 
         // 1. Fresh cache hit: Return immediately without touching the network
         if (cached != null && cached.isFresh()) {
-            return cached.toRawResponse()
+            return withCacheHeader(cached.toRawResponse(), "HIT")
         }
 
         // 2. Stale cache or cache miss: Prepare network request with conditional headers
@@ -98,17 +98,24 @@ class CacheInterceptor(
                 receivedAtMillis = System.currentTimeMillis()
             )
             cache.put(cacheKey, refreshed)
-            return RawResponse(
+            val cachedOkResponse = RawResponse(
                 statusCode = 200,
                 message = "OK (from cache)",
                 headers = mergedHeaders,
                 body = cached.body
             )
+            return withCacheHeader(cachedOkResponse, "CONDITIONAL_HIT")
         }
 
         // 4. Normal 2xx: Cache the fresh network response if allowed
         updateCacheIfCacheable(cacheKey, networkResponse)
-        return networkResponse
+        return withCacheHeader(networkResponse, "MISS")
+    }
+
+    private fun withCacheHeader(response: RawResponse, status: String): RawResponse {
+        val updatedHeaders = response.headers.headers.toMutableMap()
+        updatedHeaders["X-GANetwork-Cache"] = listOf(status)
+        return response.copy(headers = ResponseHeaders(updatedHeaders))
     }
 
     private fun updateCacheIfCacheable(cacheKey: String, response: RawResponse) {
