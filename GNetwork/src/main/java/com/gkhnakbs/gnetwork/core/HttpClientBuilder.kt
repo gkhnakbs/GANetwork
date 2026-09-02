@@ -27,9 +27,9 @@ class HttpClientBuilder {
     private var authenticator: Authenticator = Authenticator.NONE
     private var retryConfig: RetryConfig? = null
     private var cache: Cache? = null
-    private var connectTimeout: Int = 10000
-    private var readTimeout: Int = 20000
-    private var callTimeout: Long = 0L
+    private var connectTimeout: Int = HttpClient.DEFAULT_CONNECT_TIMEOUT_MS
+    private var readTimeout: Int = HttpClient.DEFAULT_READ_TIMEOUT_MS
+    private var callTimeout: Long = HttpClient.DEFAULT_CALL_TIMEOUT_MS
 
     /**
      * Configures default HTTP headers applied to all outgoing requests.
@@ -155,42 +155,42 @@ class HttpClientBuilder {
      * Sets the default connection timeout in milliseconds for all requests (defaults to 10,000 ms).
      */
     fun connectTimeout(ms: Int) = apply {
-        this.connectTimeout = ms
+        this.connectTimeout = ms.coerceAtLeast(0)
     }
 
     /**
      * Sets the default connection timeout using [Duration] for all requests.
      */
     fun connectTimeout(duration: Duration) = apply {
-        this.connectTimeout = duration.inWholeMilliseconds.toInt()
+        this.connectTimeout = duration.inWholeMilliseconds.toInt().coerceAtLeast(0)
     }
 
     /**
      * Sets the default socket read timeout in milliseconds for all requests (defaults to 20,000 ms).
      */
     fun readTimeout(ms: Int) = apply {
-        this.readTimeout = ms
+        this.readTimeout = ms.coerceAtLeast(0)
     }
 
     /**
      * Sets the default socket read timeout using [Duration] for all requests.
      */
     fun readTimeout(duration: Duration) = apply {
-        this.readTimeout = duration.inWholeMilliseconds.toInt()
+        this.readTimeout = duration.inWholeMilliseconds.toInt().coerceAtLeast(0)
     }
 
     /**
      * Sets the default call-level timeout ceiling in milliseconds for all requests (defaults to 0L, disabled).
      */
     fun callTimeout(ms: Long) = apply {
-        this.callTimeout = ms
+        this.callTimeout = ms.coerceAtLeast(0L)
     }
 
     /**
      * Sets the default call-level timeout ceiling using [Duration] for all requests.
      */
     fun callTimeout(duration: Duration) = apply {
-        this.callTimeout = duration.inWholeMilliseconds
+        this.callTimeout = duration.inWholeMilliseconds.coerceAtLeast(0L)
     }
 
     /**

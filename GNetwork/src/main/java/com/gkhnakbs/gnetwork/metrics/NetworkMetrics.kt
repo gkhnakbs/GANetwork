@@ -30,18 +30,35 @@ data class NetworkMetrics(
     val exception: Throwable? = null,
 ) {
     /**
+     * Human-readable string representation of sent payload size (e.g. "450 B", "1.2 MB").
+     */
+    val formattedSent: String
+        get() = formatBytes(sentBytes)
+
+    /**
+     * Human-readable string representation of received payload size (e.g. "1.5 KB", "10.4 MB").
+     */
+    val formattedReceived: String
+        get() = formatBytes(receivedBytes)
+
+    /**
      * Formatted summary string suitable for console logs or debugging.
      */
     fun toFormattedString(): String {
         val cacheTag = if (isFromCache) "[CACHE] " else ""
         val statusStr = if (statusCode > 0) statusCode.toString() else "FAILED"
-        return "[GANetwork Metrics] $cacheTag$method $url -> $statusStr (${durationMs}ms | Sent: ${formatBytes(sentBytes)} | Recv: ${formatBytes(receivedBytes)})"
+        return "[GANetwork Metrics] $cacheTag$method $url -> $statusStr (${durationMs}ms | Sent: $formattedSent | Recv: $formattedReceived)"
     }
 
-    private fun formatBytes(bytes: Long): String = when {
-        bytes < 1024 -> "$bytes B"
-        bytes < 1024 * 1024 -> String.format(Locale.US, "%.1f KB", bytes / 1024.0)
-        else -> String.format(Locale.US, "%.1f MB", bytes / (1024.0 * 1024.0))
+    companion object {
+        /**
+         * Formats raw byte counts into human-readable byte units.
+         */
+        fun formatBytes(bytes: Long): String = when {
+            bytes < 1024 -> "$bytes B"
+            bytes < 1024 * 1024 -> String.format(Locale.US, "%.1f KB", bytes / 1024.0)
+            else -> String.format(Locale.US, "%.1f MB", bytes / (1024.0 * 1024.0))
+        }
     }
 }
 

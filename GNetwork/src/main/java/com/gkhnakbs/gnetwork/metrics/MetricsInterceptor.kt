@@ -22,7 +22,7 @@ class MetricsInterceptor(
 
     override suspend fun intercept(chain: Interceptor.Chain): RawResponse {
         val request = chain.request
-        val startTime = System.currentTimeMillis()
+        val startNs = System.nanoTime()
         val sentBytes = (request.rawBody?.size ?: request.body?.toByteArray(Charsets.UTF_8)?.size ?: 0).toLong()
 
         var rawResponse: RawResponse? = null
@@ -36,7 +36,7 @@ class MetricsInterceptor(
             error = e
             throw e
         } finally {
-            val durationMs = System.currentTimeMillis() - startTime
+            val durationMs = (System.nanoTime() - startNs) / 1_000_000L
             val receivedBytes = rawResponse?.body?.size?.toLong() ?: 0L
             val statusCode = rawResponse?.statusCode ?: -1
             val cacheHeader = rawResponse?.headers?.firstIgnoreCase("X-GANetwork-Cache")
@@ -53,7 +53,8 @@ class MetricsInterceptor(
                 isFromCache = isFromCache,
                 exception = error,
             )
-            listener.onMetricsCollected(metrics)
+            // Ensure third-party telemetry / logging failures never disrupt ongoing network operations
+            runCatching { listener.onMetricsCollected(metrics) }
         }
     }
 

@@ -262,10 +262,11 @@ client.get<ByteArray>("download/package.zip") {
 Granular socket configuration and total request lifecycle guarantees.
 
 * **Timeout Layers:**
-  - `connectTimeout`: Maximum duration to establish the TCP/TLS socket connection (default: 10,000 ms).
-  - `readTimeout`: Maximum duration of inactivity between two consecutive data packets (default: 20,000 ms).
-  - `callTimeout`: **Hard ceiling** on the entire HTTP transaction (DNS + Connection + TLS + Interceptors + Retries + Token Refresh + Body Decoding). Exceeding this immediately cancels the coroutine and aborts the socket via `disconnect()`.
-* **Units:** Accepts milliseconds (`Int`/`Long`) or Kotlin `kotlin.time.Duration` (e.g. `15.seconds`, `2.minutes`).
+  - `connectTimeout`: Maximum duration to establish the TCP/TLS socket connection (`DEFAULT_CONNECT_TIMEOUT_MS = 10_000 ms`).
+  - `readTimeout`: Maximum duration of inactivity between two consecutive data packets (`DEFAULT_READ_TIMEOUT_MS = 20_000 ms`).
+  - `callTimeout`: **Hard ceiling** on the entire HTTP transaction (`DEFAULT_CALL_TIMEOUT_MS = 0L`, disabled). Bounded via Coroutines `withTimeout`, cancelling the call and immediately closing the socket upon expiration.
+* **Input Safety:** Automatically guards against negative values via `.coerceAtLeast(0)` across all builder setters, preventing socket-level `IllegalArgumentException` crashes.
+* **Units:** Accepts milliseconds (`Int`/`Long`) or Kotlin `kotlin.time.Duration` (`15.seconds`, `2.minutes`).
 * **Inheritance & Overrides:** Client-level defaults apply automatically, and can be overridden per request.
 
 ```kotlin
@@ -293,11 +294,13 @@ Non-intrusive monitoring of network execution latency, data transfer volumes, an
   - `url`: Target endpoint.
   - `method`: HTTP verb (GET, POST, etc.).
   - `statusCode`: HTTP status or -1 on network failure.
-  - `durationMs`: Roundtrip time in milliseconds.
+  - `durationMs`: High-precision monotonic roundtrip duration (measured via `System.nanoTime()`, immune to device clock shifts).
   - `sentBytes` / `receivedBytes`: Transfer volumes.
+  - `formattedSent` / `formattedReceived`: Pre-formatted human-readable strings (e.g. `450 B`, `1.5 MB`).
   - `isSuccessful`: True if status in 200..299.
   - `isFromCache`: True if fulfilled by local memory or disk cache.
   - `exception`: Associated exception if failed.
+* **Fault-Tolerant Telemetry Dispatch:** `listener.onMetricsCollected` is isolated with `runCatching` to guarantee that third-party APM or logging errors never crash or disrupt ongoing network requests.
 * **Integration:** Standalone `MetricsInterceptor` pluggable into any client pipeline, with built-in formatted logger for console and Android Logcat.
 
 ```kotlin

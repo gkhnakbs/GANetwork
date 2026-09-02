@@ -362,6 +362,17 @@ class HttpClient(
         val headers = connection.headerFields.filterKeys { it != null }.mapKeys { it.key!! }
         return ResponseHeaders(headers)
     }
+
+    companion object {
+        /** Default TCP/TLS handshake connection timeout (10 seconds). */
+        const val DEFAULT_CONNECT_TIMEOUT_MS: Int = 10_000
+
+        /** Default socket packet-to-packet read timeout (20 seconds). */
+        const val DEFAULT_READ_TIMEOUT_MS: Int = 20_000
+
+        /** Default overall call-level timeout ceiling (0L = disabled). */
+        const val DEFAULT_CALL_TIMEOUT_MS: Long = 0L
+    }
 }
 
 

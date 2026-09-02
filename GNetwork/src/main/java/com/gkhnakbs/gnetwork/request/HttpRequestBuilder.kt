@@ -255,7 +255,7 @@ class HttpRequestBuilder {
      * @param ms Connection timeout in milliseconds.
      */
     fun connectTimeout(ms: Int) {
-        this.connectTimeout = ms
+        this.connectTimeout = ms.coerceAtLeast(0)
     }
 
     /**
@@ -264,7 +264,7 @@ class HttpRequestBuilder {
      * @param duration Connection timeout duration.
      */
     fun connectTimeout(duration: Duration) {
-        this.connectTimeout = duration.inWholeMilliseconds.toInt()
+        this.connectTimeout = duration.inWholeMilliseconds.toInt().coerceAtLeast(0)
     }
 
     /**
@@ -273,7 +273,7 @@ class HttpRequestBuilder {
      * @param ms Read timeout in milliseconds.
      */
     fun readTimeout(ms: Int) {
-        this.readTimeout = ms
+        this.readTimeout = ms.coerceAtLeast(0)
     }
 
     /**
@@ -282,7 +282,7 @@ class HttpRequestBuilder {
      * @param duration Read timeout duration.
      */
     fun readTimeout(duration: Duration) {
-        this.readTimeout = duration.inWholeMilliseconds.toInt()
+        this.readTimeout = duration.inWholeMilliseconds.toInt().coerceAtLeast(0)
     }
 
     /**
@@ -291,7 +291,7 @@ class HttpRequestBuilder {
      * @param ms Call timeout in milliseconds (0 to disable).
      */
     fun callTimeout(ms: Long) {
-        this.callTimeout = ms
+        this.callTimeout = ms.coerceAtLeast(0L)
     }
 
     /**
@@ -300,7 +300,7 @@ class HttpRequestBuilder {
      * @param duration Call timeout duration.
      */
     fun callTimeout(duration: Duration) {
-        this.callTimeout = duration.inWholeMilliseconds
+        this.callTimeout = duration.inWholeMilliseconds.coerceAtLeast(0L)
     }
 
     /**
