@@ -7,6 +7,7 @@ import com.gkhnakbs.gnetwork.progress.Progress
 import com.gkhnakbs.gnetwork.retry.RetryConfig
 import com.gkhnakbs.gnetwork.retry.RetryConfigBuilder
 import java.net.URLEncoder
+import kotlin.time.Duration
 
 /**
  * DSL builder for configuring and assembling an [HttpRequest].
@@ -25,6 +26,9 @@ class HttpRequestBuilder {
     private var cachePolicy: CachePolicy = CachePolicy.DEFAULT
     private var onUploadProgress: ((Progress) -> Unit)? = null
     private var onDownloadProgress: ((Progress) -> Unit)? = null
+    private var connectTimeout: Int? = null
+    private var readTimeout: Int? = null
+    private var callTimeout: Long? = null
 
     /**
      * Adds an HTTP header.
@@ -233,6 +237,60 @@ class HttpRequestBuilder {
     }
 
     /**
+     * Sets the connection timeout for this specific request in milliseconds.
+     *
+     * @param ms Connection timeout in milliseconds.
+     */
+    fun connectTimeout(ms: Int) {
+        this.connectTimeout = ms
+    }
+
+    /**
+     * Sets the connection timeout for this specific request using [Duration].
+     *
+     * @param duration Connection timeout duration.
+     */
+    fun connectTimeout(duration: Duration) {
+        this.connectTimeout = duration.inWholeMilliseconds.toInt()
+    }
+
+    /**
+     * Sets the socket read timeout for this specific request in milliseconds.
+     *
+     * @param ms Read timeout in milliseconds.
+     */
+    fun readTimeout(ms: Int) {
+        this.readTimeout = ms
+    }
+
+    /**
+     * Sets the socket read timeout for this specific request using [Duration].
+     *
+     * @param duration Read timeout duration.
+     */
+    fun readTimeout(duration: Duration) {
+        this.readTimeout = duration.inWholeMilliseconds.toInt()
+    }
+
+    /**
+     * Sets the overall call-level timeout ceiling for this specific request in milliseconds.
+     *
+     * @param ms Call timeout in milliseconds (0 to disable).
+     */
+    fun callTimeout(ms: Long) {
+        this.callTimeout = ms
+    }
+
+    /**
+     * Sets the overall call-level timeout ceiling for this specific request using [Duration].
+     *
+     * @param duration Call timeout duration.
+     */
+    fun callTimeout(duration: Duration) {
+        this.callTimeout = duration.inWholeMilliseconds
+    }
+
+    /**
      * Validates and builds the immutable [HttpRequest].
      */
     fun build(): HttpRequest {
@@ -244,6 +302,9 @@ class HttpRequestBuilder {
             url = finalUrl,
             method = method,
             headers = headers.toMap(),
+            connectTimeout = connectTimeout,
+            readTimeout = readTimeout,
+            callTimeout = callTimeout,
             body = body,
             rawBody = rawBody,
             contentType = contentType,

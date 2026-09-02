@@ -273,6 +273,28 @@ client.get<String>("api/v1/reports/annual.pdf") {
 }
 ```
 
+### Zaman Aşımı Yönetimi (Timeouts & Call Timeout)
+Bağlantı (`connectTimeout`), okuma (`readTimeout`) ve tüm çağrıyı kapsayan tavan süreyi (`callTimeout`) hem istemci düzeyinde varsayılan olarak hem de istek bazında belirleyebilirsiniz. Sayısal milisaniye veya Kotlin `Duration` desteği mevcuttur.
+
+```kotlin
+// 1. İstemci Düzeyinde Varsayılan Timeout'lar:
+val client = httpClient {
+    baseUrl = "https://api.example.com/"
+    connectTimeout(10.seconds)
+    readTimeout(20.seconds)
+    callTimeout(30.seconds) // Toplam tavan süre (DNS + TLS + Retry + Body)
+}
+
+// 2. İstek Düzeyinde Özelleştirme (Override):
+client.post<UploadResponse>("api/v1/heavy-upload") {
+    multipartBody { part("video", videoFile) }
+    
+    // Yalnızca bu istek için zaman aşımlarını uzatıyoruz:
+    callTimeout(2.minutes)
+    readTimeout(60.seconds)
+}
+```
+
 ---
 
 ## SSL/TLS Yapılandırması
@@ -324,9 +346,10 @@ Ergonomi yardımcıları:
 - [x] CacheInterceptor (ETag, Cache-Control, In-Memory LRU Cache, 304 Not Modified, CachePolicy)
 - [x] Multipart/Form-Data (Dosya, görsel, binary ve form alanları yükleme desteği)
 - [x] Progress takibi (Upload ve download anlık ilerleme dinleyicisi: yüzde, bayt, tamamlama)
-- [ ] TimeoutInterceptor (call-level timeout)
-- Metrics/AnalyticsInterceptor
-- Redirect yönetimi (307/308 method/body preservation)
+- [x] Timeout Yönetimi (Client ve request düzeyinde connect, read ve callTimeout; Kotlin Duration desteği)
+- [ ] DiskLruCache (Kalıcı dosya tabanlı LRU önbellek)
+- [ ] Metrics/AnalyticsInterceptor
+- [ ] Redirect yönetimi (307/308 method/body preservation)
 
 ---
 

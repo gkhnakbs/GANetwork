@@ -10,8 +10,9 @@ import com.gkhnakbs.gnetwork.retry.RetryConfig
  * @property url The target URL or relative path.
  * @property method The HTTP method (GET, POST, PUT, DELETE).
  * @property headers Map of HTTP request header key-value pairs.
- * @property connectTimeout Connection timeout in milliseconds (defaults to 10,000 ms).
- * @property readTimeout Socket read timeout in milliseconds (defaults to 20,000 ms).
+ * @property connectTimeout Optional connection timeout in milliseconds. Falls back to client default if null.
+ * @property readTimeout Optional socket read timeout in milliseconds. Falls back to client default if null.
+ * @property callTimeout Optional total call-level timeout ceiling in milliseconds. Falls back to client default if null.
  * @property body Optional request payload string.
  * @property rawBody Optional raw binary request payload (e.g. multipart/form-data or binary stream).
  * @property contentType Optional [ContentType] specifying the request body format.
@@ -26,8 +27,9 @@ data class HttpRequest(
     val url: String,
     val method: HttpMethod = HttpMethod.GET,
     val headers: Map<String, String> = emptyMap(),
-    val connectTimeout: Int = 10000,
-    val readTimeout: Int = 20000,
+    val connectTimeout: Int? = null,
+    val readTimeout: Int? = null,
+    val callTimeout: Long? = null,
     val body: String? = null,
     val rawBody: ByteArray? = null,
     val contentType: ContentType? = null,
@@ -45,6 +47,7 @@ data class HttpRequest(
         if (headers != other.headers) return false
         if (connectTimeout != other.connectTimeout) return false
         if (readTimeout != other.readTimeout) return false
+        if (callTimeout != other.callTimeout) return false
         if (body != other.body) return false
         if (rawBody != null) {
             if (other.rawBody == null) return false
@@ -61,8 +64,9 @@ data class HttpRequest(
         var result = url.hashCode()
         result = 31 * result + method.hashCode()
         result = 31 * result + headers.hashCode()
-        result = 31 * result + connectTimeout
-        result = 31 * result + readTimeout
+        result = 31 * result + (connectTimeout ?: 0)
+        result = 31 * result + (readTimeout ?: 0)
+        result = 31 * result + (callTimeout?.hashCode() ?: 0)
         result = 31 * result + (body?.hashCode() ?: 0)
         result = 31 * result + (rawBody?.contentHashCode() ?: 0)
         result = 31 * result + (contentType?.hashCode() ?: 0)

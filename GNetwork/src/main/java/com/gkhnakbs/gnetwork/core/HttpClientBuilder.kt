@@ -10,6 +10,7 @@ import com.gkhnakbs.gnetwork.retry.RetryConfigBuilder
 import com.gkhnakbs.gnetwork.retry.RetryInterceptor
 import com.gkhnakbs.gnetwork.ssl.SSLConfig
 import com.gkhnakbs.gnetwork.ssl.SSLConfigBuilder
+import kotlin.time.Duration
 
 /**
  * Builder class for constructing and configuring [HttpClient] instances.
@@ -24,6 +25,9 @@ class HttpClientBuilder {
     private var authenticator: Authenticator = Authenticator.NONE
     private var retryConfig: RetryConfig? = null
     private var cache: Cache? = null
+    private var connectTimeout: Int = 10000
+    private var readTimeout: Int = 20000
+    private var callTimeout: Long = 0L
 
     /**
      * Configures default HTTP headers applied to all outgoing requests.
@@ -128,6 +132,48 @@ class HttpClientBuilder {
     }
 
     /**
+     * Sets the default connection timeout in milliseconds for all requests (defaults to 10,000 ms).
+     */
+    fun connectTimeout(ms: Int) = apply {
+        this.connectTimeout = ms
+    }
+
+    /**
+     * Sets the default connection timeout using [Duration] for all requests.
+     */
+    fun connectTimeout(duration: Duration) = apply {
+        this.connectTimeout = duration.inWholeMilliseconds.toInt()
+    }
+
+    /**
+     * Sets the default socket read timeout in milliseconds for all requests (defaults to 20,000 ms).
+     */
+    fun readTimeout(ms: Int) = apply {
+        this.readTimeout = ms
+    }
+
+    /**
+     * Sets the default socket read timeout using [Duration] for all requests.
+     */
+    fun readTimeout(duration: Duration) = apply {
+        this.readTimeout = duration.inWholeMilliseconds.toInt()
+    }
+
+    /**
+     * Sets the default call-level timeout ceiling in milliseconds for all requests (defaults to 0L, disabled).
+     */
+    fun callTimeout(ms: Long) = apply {
+        this.callTimeout = ms
+    }
+
+    /**
+     * Sets the default call-level timeout ceiling using [Duration] for all requests.
+     */
+    fun callTimeout(duration: Duration) = apply {
+        this.callTimeout = duration.inWholeMilliseconds
+    }
+
+    /**
      * Builds and returns the configured [HttpClient].
      */
     fun build(): HttpClient {
@@ -146,6 +192,9 @@ class HttpClientBuilder {
             interceptors = allInterceptors,
             sslConfig = sslConfig,
             authenticator = authenticator,
+            connectTimeout = connectTimeout,
+            readTimeout = readTimeout,
+            callTimeout = callTimeout,
         )
     }
 }

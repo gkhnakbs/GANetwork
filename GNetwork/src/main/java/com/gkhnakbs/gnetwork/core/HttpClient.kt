@@ -22,6 +22,9 @@ import java.net.HttpURLConnection
 import java.net.URI
 import com.gkhnakbs.gnetwork.auth.Authenticator
 import com.gkhnakbs.gnetwork.progress.Progress
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.withTimeout
+import java.util.concurrent.TimeoutException
 import javax.net.ssl.HttpsURLConnection
 import javax.net.ssl.SSLPeerUnverifiedException
 import kotlin.coroutines.resume
@@ -38,6 +41,9 @@ import kotlin.coroutines.resume
  * @property interceptors Ordered list of [Interceptor] instances applied to every request.
  * @property sslConfig SSL/TLS security settings including custom trust managers and certificate pinning.
  * @property authenticator Authenticator invoked when encountering 401 Unauthorized responses.
+ * @property connectTimeout Default connection timeout in milliseconds (defaults to 10,000 ms).
+ * @property readTimeout Default socket read timeout in milliseconds (defaults to 20,000 ms).
+ * @property callTimeout Default call-level timeout ceiling in milliseconds (defaults to 0L, disabled).
  *
  * Created by Gökhan Akbaş on 12/11/2025.
  */
@@ -53,6 +59,9 @@ class HttpClient(
     private val interceptors: List<Interceptor> = emptyList(),
     private val sslConfig: SSLConfig = SSLConfig.default(),
     val authenticator: Authenticator = Authenticator.NONE,
+    val connectTimeout: Int = 10000,
+    val readTimeout: Int = 20000,
+    val callTimeout: Long = 0L,
 ) {
     /**
      * Executes the given [request] and deserializes the successful response into [T].
@@ -72,6 +81,27 @@ class HttpClient(
         request: HttpRequest,
         serializer: KSerializer<T>,
     ): HttpResponse<T> = withContext(Dispatchers.IO) {
+        val effectiveCallTimeout = request.callTimeout ?: callTimeout
+        if (effectiveCallTimeout > 0L) {
+            try {
+                withTimeout(effectiveCallTimeout) {
+                    executeChainAndParse(request, serializer)
+                }
+            } catch (e: TimeoutCancellationException) {
+                HttpResponse.Error(
+                    exception = TimeoutException("Call timed out after ${effectiveCallTimeout}ms"),
+                    message = "Call timed out after ${effectiveCallTimeout}ms"
+                )
+            }
+        } else {
+            executeChainAndParse(request, serializer)
+        }
+    }
+
+    private suspend fun <T> executeChainAndParse(
+        request: HttpRequest,
+        serializer: KSerializer<T>,
+    ): HttpResponse<T> {
         val startRequest = requestWithBaseAndHeaders(request)
         val chain = RealInterceptorChain(
             interceptors = interceptors + TerminalInterceptor(::performNetworkCall),
@@ -93,7 +123,7 @@ class HttpClient(
             }
         }
 
-        return@withContext parseRawResponse(raw, serializer)
+        return parseRawResponse(raw, serializer)
     }
 
     private fun requestWithBaseAndHeaders(request: HttpRequest): HttpRequest {
@@ -229,8 +259,8 @@ class HttpClient(
 
         with(connection) {
             requestMethod = request.method.name
-            connectTimeout = request.connectTimeout
-            readTimeout = request.readTimeout
+            connectTimeout = request.connectTimeout ?: this@HttpClient.connectTimeout
+            readTimeout = request.readTimeout ?: this@HttpClient.readTimeout
             doInput = true
             useCaches = false
             instanceFollowRedirects = true
