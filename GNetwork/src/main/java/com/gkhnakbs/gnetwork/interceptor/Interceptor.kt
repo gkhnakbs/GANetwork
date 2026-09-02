@@ -23,8 +23,9 @@ interface Interceptor {
 
         /**
          * Forwards the [request] to the next interceptor in the pipeline.
+         * Defaults to [request] if omitted.
          */
-        suspend fun proceed(request: HttpRequest): RawResponse
+        suspend fun proceed(request: HttpRequest = this.request): RawResponse
     }
 }
 

@@ -61,19 +61,34 @@ client.post<Unit>("auth/logout").onSuccess { println("Logged out successfully") 
 Implements the **Chain of Responsibility** pattern, enabling modular request/response transformation, logging, header injection, caching, and diagnostics.
 
 * **Components:**
-  - `Interceptor`: Functional contract receiving `Interceptor.Chain` and returning `RawResponse`.
+  - `Interceptor`: Contract receiving `Interceptor.Chain` and returning `RawResponse`.
   - `RealInterceptorChain`: Immutable execution state holding the ordered interceptor list and current index.
   - `TerminalInterceptor`: Terminal chain node executing the actual socket connection.
+  - `Interceptor.Chain.proceed(request = this.request)`: Advances the chain with a default parameter, enabling pure observation interceptors to simply call `chain.proceed()`.
 * **Execution Flow:**
   `Client -> RetryInterceptor -> CacheInterceptor -> Custom Interceptors -> TerminalInterceptor (Network)`
+* **Safe Diagnostics (`LoggingInterceptor`):**
+  - Displays formatted JSON bodies, request/response headers, and response duration emojis.
+  - Safely detects binary/multipart payloads (`ByteArray`, file uploads, images, audio, PDFs) and logs payload summaries (`[Binary payload: 245 KB (image/png)]`) without memory spikes or console corruption.
 
 ```kotlin
+// Example: Modifying headers in an interceptor:
 class ApiKeyInterceptor(private val apiKey: String) : Interceptor {
     override suspend fun intercept(chain: Interceptor.Chain): RawResponse {
         val updatedRequest = chain.request.copy(
             headers = chain.request.headers + ("X-Api-Key" to apiKey)
         )
         return chain.proceed(updatedRequest)
+    }
+}
+
+// Example: Pure observer interceptor (using default parameter):
+class LatencyObserver : Interceptor {
+    override suspend fun intercept(chain: Interceptor.Chain): RawResponse {
+        val start = System.currentTimeMillis()
+        val response = chain.proceed() // defaults to chain.request
+        println("Completed in ${System.currentTimeMillis() - start}ms")
+        return response
     }
 }
 ```

@@ -49,10 +49,19 @@ class LoggingInterceptor(
             }
         }
 
-        if (level >= Level.BODY && !req.body.isNullOrEmpty()) {
-            logSection("Request Body")
-            val formattedBody = formatBody(req.body)
-            log(formattedBody.prependIndent("  "))
+        if (level >= Level.BODY) {
+            when {
+                !req.body.isNullOrEmpty() -> {
+                    logSection("Request Body")
+                    val formattedBody = formatBody(req.body)
+                    log(formattedBody.prependIndent("  "))
+                }
+                req.rawBody != null && req.rawBody.isNotEmpty() -> {
+                    logSection("Request Body")
+                    val contentType = req.headers["Content-Type"] ?: "application/octet-stream"
+                    log("  [Binary/Multipart payload: ${req.rawBody.size} bytes ($contentType)]")
+                }
+            }
         }
 
         // Timing başlat
@@ -73,16 +82,33 @@ class LoggingInterceptor(
 
         if (level >= Level.BODY && resp.body.isNotEmpty()) {
             logSection("Response Body")
-            val text = withContext(Dispatchers.Default) {
-                resp.body.toString(charset)
+            val contentType = resp.headers.firstIgnoreCase("Content-Type") ?: ""
+            if (isTextContentType(contentType)) {
+                val text = withContext(Dispatchers.Default) {
+                    resp.body.toString(charset)
+                }
+                val formattedBody = formatBody(text)
+                log(formattedBody.take(10_000).prependIndent("  "))
+            } else {
+                val displayType = contentType.ifBlank { "application/octet-stream" }
+                log("  [Binary payload: ${resp.body.size} bytes ($displayType)]")
             }
-            val formattedBody = formatBody(text)
-            log(formattedBody.take(10_000).prependIndent("  "))
         }
 
         logEnd()
 
         return resp
+    }
+
+    private fun isTextContentType(contentType: String): Boolean {
+        if (contentType.isBlank()) return true
+        val lower = contentType.lowercase()
+        return lower.contains("text") ||
+                lower.contains("json") ||
+                lower.contains("xml") ||
+                lower.contains("html") ||
+                lower.contains("javascript") ||
+                lower.contains("form-urlencoded")
     }
 
     private fun logSeparator(title: String) {
